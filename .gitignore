@@ -1,0 +1,7 @@
+.idea
+.~*
+reports
+__pycache__
+secret.py
+examples
+reports
