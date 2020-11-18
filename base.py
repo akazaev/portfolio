@@ -16,7 +16,6 @@ def get_client():
 
 
 def date_to_key(date):
-    #return date.strftime('%Y-%m-%d')
     return date.year, date.month, date.day
 
 
@@ -28,6 +27,8 @@ class TimeRange:
     def __init__(self, start_time, end_time):
         self.start_time = start_time
         self.end_time = end_time
+        self.start = date_to_key(start_time) if start_time else None
+        self.end = date_to_key(end_time) if end_time else None
 
 
 class DBManager:

@@ -22,6 +22,19 @@ class Portfolio:
     def __init__(self, portfolio_id):
         self.portfolio_id = portfolio_id
 
+    def cbr(self, start_date, end_date):
+        assert isinstance(start_date, datetime)
+        assert isinstance(end_date, datetime)
+        end_date = end_date.replace(hour=23, minute=59, second=59)
+        time_range = TimeRange(start_date, end_date)
+
+        data = self.get_value_history(time_range)
+        cbr_data = self.get_cbr_history(time_range)
+        cash_data = self.get_cash_history(time_range)
+
+        assert len(data) == len(cbr_data)
+        assert len(data) == len(cash_data)
+
     def chart_cbr(self, start_date, end_date):
         assert isinstance(start_date, datetime)
         assert isinstance(end_date, datetime)
@@ -64,7 +77,6 @@ class Portfolio:
         cur_range = TimeRange(key_to_date(all_orders[0].date),
                               time_range.end_time)
         dates = self.get_dates(cur_range)
-        start_date = date_to_key(time_range.start_time)
 
         for order in all_orders:
             operations[order.date].append(order)
@@ -77,7 +89,6 @@ class Portfolio:
                     raise ValueError()
 
         portfolio = defaultdict(int)
-
         for date in dates:
             day_orders = operations[date]
 
@@ -95,7 +106,7 @@ class Portfolio:
                 if isinstance(order, Money):
                     portfolio[(cur, cur)] += sum
 
-            if date < start_date:
+            if date < time_range.start:
                 continue
 
             if date in usd:
@@ -145,14 +156,11 @@ class Portfolio:
         money_range = TimeRange(None, time_range.end_time)
         money_orders = MoneyManager.get_operations(self.portfolio_id,
                                                    money_range)
-
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
         usd = QuotesManager.get_quotes(self.USD, cur_range)
         eur = QuotesManager.get_quotes(self.EUR, cur_range)
-
         dates = self.get_dates(cur_range)
-        start_date = date_to_key(time_range.start_time)
 
         operations = defaultdict(list)
         for order in money_orders:
@@ -175,7 +183,7 @@ class Portfolio:
             rate = CBR_RATE.get(date, rate)
             pr = rate / 100 / 365.5
             proc += prev * pr
-            if date >= start_date:
+            if date >= time_range.start:
                 cash[date] = s + proc
             proc += proc * pr
             prev = s
@@ -198,9 +206,7 @@ class Portfolio:
                               time_range.end_time)
         usd = QuotesManager.get_quotes(self.USD, cur_range)
         eur = QuotesManager.get_quotes(self.EUR, cur_range)
-
         dates = self.get_dates(cur_range)
-        start_date = date_to_key(time_range.start_time)
 
         operations = defaultdict(list)
         for order in money_orders:
@@ -218,7 +224,7 @@ class Portfolio:
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
-            if date < start_date:
+            if date < time_range.start:
                 continue
 
             cash[date] = s
@@ -229,8 +235,12 @@ class Portfolio:
         fig, ax = plt.subplots()
         t = range(len(args[0]))
 
+        d1 = next(iter(args[0]))
+        d2 = next(reversed(args[0]))
+
         for data in args:
             ax.plot(t, data.values())
 
         ax.grid()
+        ax.set_title(f'{d1[0]}-{d1[1]}-{d1[2]} - {d2[0]}-{d2[1]}-{d2[2]}')
         plt.show()

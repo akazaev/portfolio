@@ -2,7 +2,7 @@ from datetime import timedelta
 from collections import OrderedDict, namedtuple
 from functools import lru_cache
 
-from base import DBManager, date_to_key, key_to_date, TimeRange
+from base import DBManager, date_to_key, TimeRange
 from loaders import QuotesLoader
 
 
@@ -20,16 +20,15 @@ class QuotesManager(DBManager):
             result[date_to_key(record['time'])] = record['price']
             last = record
         last_date = last['time'] + timedelta(days=1)
-        req_date = date_to_key(time_range.end_time)
-        if date_to_key(last_date) < req_date:
+        if date_to_key(last_date) < time_range.end:
             time_range = TimeRange(last_date, time_range.end_time)
             data = QuotesLoader.load(isin, time_range)
             for record in data:
-                if date_to_key(record['time']) > req_date:
+                if date_to_key(record['time']) > time_range.end:
                     break
                 result[date_to_key(record['time'])] = record['price']
                 last = record
-        assert date_to_key(last['time']) == req_date
+        assert date_to_key(last['time']) == time_range.end
         return result
 
 
@@ -62,8 +61,7 @@ class OrdersManager(DBManager):
         data = cls.get(portfolio=portfolio_id, date=time_range, sort='time')
         data = [cls.model(date=date_to_key(row['date']), isin=row['isin'],
                           quantity=row['quantity'], sum=row['sum'],
-                          cur=row['cur'])
-                for row in data]
+                          cur=row['cur']) for row in data]
         return data
 
 

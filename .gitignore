@@ -4,4 +4,4 @@ reports
 __pycache__
 secret.py
 examples
-reports
+test_*.py

@@ -29,14 +29,16 @@ class QuotesLoader(DBManager):
             data={'figi': figi, 'from': from_time, 'to': to_time,
                   'interval': 'day'}, headers=headers)
 
+        data_save = []
         for day in response.json()['payload']['candles']:
             time = datetime.strptime(day['time'], '%Y-%m-%dT%H:%M:%SZ')
             price = float(day['c'])
-            data_save = {
+            record = {
                 'time': time,
                 'price': price,
                 'isin': isin.upper(),
                 'figi': figi.upper(),
             }
-            cls.upsert(data_save, data_save)
-            yield {'time': time, 'price': price}
+            data_save.append(record)
+            cls.insert(data_save)
+        return data_save
