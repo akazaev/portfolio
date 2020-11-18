@@ -1,81 +1,17 @@
-from collections import namedtuple
 from functools import lru_cache
 import builtins
 
+from base import date_to_key, key_to_date
 from collections import defaultdict, OrderedDict
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 
-from base import DBManager, TimeRange
+from base import TimeRange
 from config import CBR_RATE, CBR_BASE_RATE
-
-
-def date_to_key(date):
-    #return date.strftime('%Y-%m-%d')
-    return date.year, date.month, date.day
-
-
-def key_to_date(date):
-    return datetime(date[0], date[1], date[2])
-
-
-class QuotesManager(DBManager):
-    collection = 'quotes'
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def get_quotes(cls, isin, time_range):
-        data = cls.get(isin=isin, time=time_range, sort='time',
-                       fields={'time': 1, 'price': 1})
-        result = OrderedDict()
-        for record in data:
-            result[date_to_key(record['time'])] = record['price']
-        return result
-
-
-Money = namedtuple('Operation', ['date', 'cur', 'sum'])
-
-
-class MoneyManager(DBManager):
-    collection = 'money'
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def get_operations(cls, portfolio_id, time_range):
-        data = cls.get(portfolio=portfolio_id, date=time_range, sort='time')
-        data = [Money(date=date_to_key(row['date']), cur=row['cur'],
-                      sum=row['sum']) for row in data]
-        return data
-
-
-Order = namedtuple('Order', ['date', 'isin', 'quantity', 'sum', 'cur'])
-
-
-class OrdersManager(DBManager):
-    collection = 'orders'
-    model = Order
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def get_orders(cls, portfolio_id, time_range):
-        data = cls.get(portfolio=portfolio_id, date=time_range, sort='time')
-        data = [cls.model(date=date_to_key(row['date']), isin=row['isin'],
-                          quantity=row['quantity'], sum=row['sum'],
-                          cur=row['cur'])
-                for row in data]
-        return data
-
-
-class SecuritiesManager(DBManager):
-    collection = 'securities'
-
-    @classmethod
-    @lru_cache(maxsize=None)
-    def get_securities(cls, isin):
-        data = cls.get(isin=isin, first=True)
-        assert data
-        return {'cur': data['currency']}
+from managers import (
+    QuotesManager, OrdersManager, MoneyManager, SecuritiesManager,
+    Order, Money)
 
 
 class Portfolio:
@@ -89,6 +25,7 @@ class Portfolio:
     def chart_cbr(self, start_date, end_date):
         assert isinstance(start_date, datetime)
         assert isinstance(end_date, datetime)
+        end_date = end_date.replace(hour=23, minute=59, second=59)
         time_range = TimeRange(start_date, end_date)
 
         data = self.get_value_history(time_range)
@@ -108,8 +45,8 @@ class Portfolio:
             'je00b5bcw814': 'ru000a1025v3',
         }
 
-        usd = QuotesManager.get_quotes('USD', time_range)
-        eur = QuotesManager.get_quotes('EUR', time_range)
+        usd = QuotesManager.get_quotes(self.USD, time_range)
+        eur = QuotesManager.get_quotes(self.EUR, time_range)
 
         value = {}
         prev_price = {}
@@ -162,9 +99,9 @@ class Portfolio:
                 continue
 
             if date in usd:
-                prev_price['usd'] = usd[date]
+                prev_price[self.USD] = usd[date]
             if date in eur:
-                prev_price['eur'] = eur[date]
+                prev_price[self.EUR] = eur[date]
 
             portfolio_sum = 0
             for key, quantity in portfolio.items():
@@ -172,16 +109,10 @@ class Portfolio:
                 if isin == self.RUB:
                     portfolio_sum += quantity
                 elif isin == self.USD:
-                    if date in usd:
-                        c = usd[date]
-                    else:
-                        c = prev_price['usd']
+                    c = usd.get(date, prev_price[self.USD])
                     portfolio_sum += c * quantity
                 elif isin == self.EUR:
-                    if date in eur:
-                        c = eur[date]
-                    else:
-                        c = prev_price['eur']
+                    c = eur.get(date, prev_price[self.EUR])
                     portfolio_sum += c * quantity
                 else:
                     if isin in changes:
@@ -193,20 +124,15 @@ class Portfolio:
                     else:
                         c1 = prev_price[isin]
 
-                    cur = SecuritiesManager.get_securities(isin=isin)['cur']
+                    security = SecuritiesManager.get_securities(isin=isin)
+                    cur = security['currency']
 
                     if cur == self.RUB:
                         c2 = 1
                     elif cur == self.USD:
-                        if date in usd:
-                            c2 = usd[date]
-                        else:
-                            c2 = prev_price['usd']
+                        c2 = usd.get(date, prev_price[self.USD])
                     elif cur == self.EUR:
-                        if date in eur:
-                            c2 = eur[date]
-                        else:
-                            c2 = prev_price['eur']
+                        c2 = eur.get(date, prev_price[self.EUR])
                     else:
                         raise ValueError(cur)
 
@@ -222,8 +148,8 @@ class Portfolio:
 
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
-        usd = QuotesManager.get_quotes('USD', cur_range)
-        eur = QuotesManager.get_quotes('EUR', cur_range)
+        usd = QuotesManager.get_quotes(self.USD, cur_range)
+        eur = QuotesManager.get_quotes(self.EUR, cur_range)
 
         dates = self.get_dates(cur_range)
         start_date = date_to_key(time_range.start_time)
@@ -255,25 +181,6 @@ class Portfolio:
             prev = s
         return cash
 
-    def get_cbr_history2(self, time_range):
-        cash = self.get_cash_history(time_range)
-        dates = self.get_dates(time_range)
-
-        rate = CBR_BASE_RATE
-        bank = OrderedDict()
-        prev = cash[dates[0]]
-        bank[dates[0]] = prev
-        proc = 0
-        for day in dates[1:]:
-            rate = CBR_RATE.get(day, rate)
-            pr = rate / 100 / 365.5
-            proc += prev * pr
-            if money_orders[0].date >= date:
-                bank[day] = cash[day] + proc
-            proc += proc * pr
-            prev = cash[day]
-        return bank
-
     @lru_cache(maxsize=None)
     def get_dates(self, time_range):
         dates = []
@@ -289,8 +196,8 @@ class Portfolio:
                                                    money_range)
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
-        usd = QuotesManager.get_quotes('USD', cur_range)
-        eur = QuotesManager.get_quotes('EUR', cur_range)
+        usd = QuotesManager.get_quotes(self.USD, cur_range)
+        eur = QuotesManager.get_quotes(self.EUR, cur_range)
 
         dates = self.get_dates(cur_range)
         start_date = date_to_key(time_range.start_time)

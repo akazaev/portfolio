@@ -1,3 +1,4 @@
+from datetime import datetime
 from pymongo import MongoClient, ASCENDING
 
 from config import MONGO_URL
@@ -12,6 +13,15 @@ def get_client():
         client = MongoClient(MONGO_URL)
         _CLIENT = client
     return _CLIENT
+
+
+def date_to_key(date):
+    #return date.strftime('%Y-%m-%d')
+    return date.year, date.month, date.day
+
+
+def key_to_date(date):
+    return datetime(date[0], date[1], date[2])
 
 
 class TimeRange:
