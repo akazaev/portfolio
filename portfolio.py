@@ -35,9 +35,13 @@ class Portfolio:
         assert len(data) == len(cbr_data)
         assert len(data) == len(cash_data)
 
+    def current_value(self):
+        pass
+
     def chart_cbr(self, start_date, end_date):
         assert isinstance(start_date, datetime)
         assert isinstance(end_date, datetime)
+        start_date = start_date.replace(hour=0, minute=0, second=0)
         end_date = end_date.replace(hour=23, minute=59, second=59)
         time_range = TimeRange(start_date, end_date)
 

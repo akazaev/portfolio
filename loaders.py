@@ -10,7 +10,7 @@ class QuotesLoader(DBManager):
     collection = 'quotes'
 
     @classmethod
-    def load(cls, isin, time_range):
+    def load(cls, isin, time_range, interval='day'):
         from managers import SecuritiesManager
         data = SecuritiesManager.get_securities(isin=isin)
         figi = data['figi']
@@ -27,7 +27,7 @@ class QuotesLoader(DBManager):
         response = requests.get(
             API_URL + '/market/candles',
             data={'figi': figi, 'from': from_time, 'to': to_time,
-                  'interval': 'day'}, headers=headers)
+                  'interval': interval}, headers=headers)
 
         data_save = []
         for day in response.json()['payload']['candles']:
@@ -38,7 +38,8 @@ class QuotesLoader(DBManager):
                 'price': price,
                 'isin': isin.upper(),
                 'figi': figi.upper(),
+                'interval': interval,
             }
             data_save.append(record)
-            cls.insert(data_save)
+        cls.insert(data_save)
         return data_save

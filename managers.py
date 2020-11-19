@@ -19,8 +19,10 @@ class QuotesManager(DBManager):
         for record in data:
             result[date_to_key(record['time'])] = record['price']
             last = record
-        last_date = last['time'] + timedelta(days=1)
+        last_date = last['time'] if last else time_range.start_time
         if date_to_key(last_date) < time_range.end:
+            if last is not None:
+                last_date += timedelta(days=1)
             time_range = TimeRange(last_date, time_range.end_time)
             data = QuotesLoader.load(isin, time_range)
             for record in data:
