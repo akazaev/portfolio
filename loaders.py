@@ -2,13 +2,10 @@ from datetime import datetime
 
 import requests
 
-from base import DBManager
 from config import API_URL, API_TOKEN
 
 
-class QuotesLoader(DBManager):
-    collection = 'quotes'
-
+class QuotesLoader:
     @classmethod
     def load(cls, isin, time_range, interval='day'):
         from managers import SecuritiesManager
@@ -41,5 +38,4 @@ class QuotesLoader(DBManager):
                 'interval': interval,
             }
             data_save.append(record)
-        cls.insert(data_save)
         return data_save
