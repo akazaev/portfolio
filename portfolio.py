@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from base import TimeRange
 from config import CBR_RATE, CBR_BASE_RATE
+from loaders import QuotesLoader
 from managers import (
     QuotesManager, OrdersManager, MoneyManager, SecuritiesManager,
     Order, Money)
@@ -156,6 +157,67 @@ class Portfolio:
             value[date] = portfolio_sum
         return value
 
+    def get_value(self):
+        changes = {
+            'JE00B5BCW814': 'RU000A1025V3',
+            'je00b5bcw814': 'ru000a1025v3',
+        }
+
+        usd = QuotesLoader.current(self.USD)
+        eur = QuotesLoader.current(self.EUR)
+
+        orders_range = TimeRange(None, datetime.now())
+        stock_orders = OrdersManager.get_orders(self.portfolio_id,
+                                                orders_range)
+        money_orders = MoneyManager.get_operations(self.portfolio_id,
+                                                   orders_range)
+        all_orders = stock_orders + money_orders
+        all_orders.sort(key=lambda x: x[0])
+
+        portfolio = defaultdict(int)
+
+        for order in all_orders:
+            cur = order.cur
+            sum = order.sum
+            if isinstance(order, Order):
+                isin = order.isin
+                quantity = order.quantity
+                portfolio[(isin, cur)] += quantity
+                portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
+            if isinstance(order, Money):
+                portfolio[(cur, cur)] += sum
+
+        portfolio_sum = 0
+        for key, quantity in portfolio.items():
+            isin, cur = key
+            if isin == self.RUB:
+                portfolio_sum += quantity
+            elif isin == self.USD:
+                c = usd
+                portfolio_sum += c * quantity
+            elif isin == self.EUR:
+                c = eur
+                portfolio_sum += c * quantity
+            else:
+                if isin in changes:
+                    isin = changes[isin]
+                c1 = QuotesLoader.current(isin)
+
+                security = SecuritiesManager.get_securities(isin=isin)
+                cur = security['currency']
+
+                if cur == self.RUB:
+                    c2 = 1
+                elif cur == self.USD:
+                    c2 = usd
+                elif cur == self.EUR:
+                    c2 = eur
+                else:
+                    raise ValueError(cur)
+
+                portfolio_sum += c1 * c2 * quantity
+        return portfolio_sum
+
     def get_cbr_history(self, time_range):
         money_range = TimeRange(None, time_range.end_time)
         money_orders = MoneyManager.get_operations(self.portfolio_id,
@@ -183,7 +245,6 @@ class Portfolio:
         s = prev = proc = 0
         for date in dates:
             s += builtins.sum(operations[date])
-
             rate = CBR_RATE.get(date, rate)
             pr = rate / 100 / 365.5
             proc += prev * pr

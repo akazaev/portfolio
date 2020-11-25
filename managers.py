@@ -24,7 +24,7 @@ class QuotesManager(DBManager):
             if last is not None:
                 last_date += timedelta(days=1)
             time_range = TimeRange(last_date, time_range.end_time)
-            data = QuotesLoader.load(isin, time_range)
+            data = QuotesLoader.history(isin, time_range)
             cls.insert(data)
             for record in data:
                 if date_to_key(record['time']) > time_range.end:

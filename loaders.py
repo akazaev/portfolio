@@ -2,19 +2,16 @@ from datetime import datetime
 
 import requests
 
-from config import API_URL, API_TOKEN
+from config import API_URL, API_TOKEN, ISS_API_URL
 
 
 class QuotesLoader:
     @classmethod
-    def load(cls, isin, time_range, interval='day'):
+    def history(cls, isin, time_range, interval='day'):
         from managers import SecuritiesManager
         data = SecuritiesManager.get_securities(isin=isin)
         figi = data['figi']
-
-        headers = {
-            'Authorization': f'Bearer {API_TOKEN}'
-        }
+        headers = {'Authorization': f'Bearer {API_TOKEN}'}
 
         frmt = '%Y-%m-%dT00:00:00.000000+03:00'
         from_time = time_range.start_time.strftime(frmt)
@@ -39,3 +36,42 @@ class QuotesLoader:
             }
             data_save.append(record)
         return data_save
+
+    @classmethod
+    def _get_iss_data(cls, code):
+        url = f'{ISS_API_URL}/iss/engines/currency/markets/selt/' \
+              f'boards/CETS/securities/%s.json'
+        response = requests.get(url % code)
+        data = response.json()['marketdata']
+        last = data['data'][0][data['columns'].index('LAST')]
+        status = data['data'][0][data['columns'].index('TRADINGSTATUS')]
+        # status: N, T
+        return last, status == 'T'
+
+    @classmethod
+    def _get_broker_data(cls, isin):
+        from managers import SecuritiesManager
+        data = SecuritiesManager.get_securities(isin=isin)
+        figi = data['figi']
+        headers = {'Authorization': f'Bearer {API_TOKEN}'}
+
+        response = requests.get(API_URL + '/market/orderbook',
+                                data={'figi': figi, 'depth': 0},
+                                headers=headers)
+        return response.json()['payload']['lastPrice']
+
+    @classmethod
+    def current(cls, isin):
+        currencies = {
+            'USD': ('USD000000TOD', 'USD000UTSTOM', ),
+            'EUR': ('EUR_RUB__TOD', 'EUR_RUB__TOM',),
+        }
+        if isin in currencies:
+            last, active = cls._get_iss_data(currencies[isin][0])
+            if not active:
+                last, active = cls._get_iss_data(currencies[isin][1])
+                if not active:
+                    raise ValueError()
+        else:
+            last = cls._get_broker_data(isin)
+        return last
