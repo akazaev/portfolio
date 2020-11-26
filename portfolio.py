@@ -20,8 +20,9 @@ class Portfolio:
     USD = 'USD'
     EUR = 'EUR'
 
-    def __init__(self, portfolio_id):
+    def __init__(self, portfolio_id, broker_id=None):
         self.portfolio_id = portfolio_id
+        self.broker_id = broker_id
 
     def cbr(self, start_date, end_date):
         assert isinstance(start_date, datetime)
@@ -36,28 +37,43 @@ class Portfolio:
         assert len(data) == len(cbr_data)
         assert len(data) == len(cash_data)
 
-    def current_value(self):
-        pass
-
-    def chart_cbr(self, start_date, end_date):
+    def chart_cbr(self, start_date, end_date, currency=RUB):
         assert isinstance(start_date, datetime)
         assert isinstance(end_date, datetime)
         start_date = start_date.replace(hour=0, minute=0, second=0)
         end_date = end_date.replace(hour=23, minute=59, second=59)
         time_range = TimeRange(start_date, end_date)
 
-        data = self.get_value_history(time_range)
-        cbr_data = self.get_cbr_history(time_range)
-        cash_data = self.get_cash_history(time_range)
+        data = self.get_value_history(time_range, currency=currency)
+        cbr_data = self.get_cbr_history(time_range, currency=currency)
+        cash_data = self.get_cash_history(time_range, currency=currency)
 
         assert len(data) == len(cbr_data)
         assert len(data) == len(cash_data)
 
         self.show_charts(data, cbr_data, cash_data)
-        #self.show_charts(cash_data, cbr_data)
-        #self.show_charts(cash_data)
 
-    def get_value_history(self, time_range):
+    def chart_profit(self, start_date, end_date, currency=RUB):
+        assert isinstance(start_date, datetime)
+        assert isinstance(end_date, datetime)
+        start_date = start_date.replace(hour=0, minute=0, second=0)
+        end_date = end_date.replace(hour=23, minute=59, second=59)
+        time_range = TimeRange(start_date, end_date)
+
+        data = self.get_value_history(time_range, currency=currency)
+        cbr_data = self.get_cbr_history(time_range, currency=currency)
+        cash_data = self.get_cash_history(time_range, currency=currency)
+
+        assert len(data) == len(cbr_data)
+        assert len(data) == len(cash_data)
+
+        for day in cash_data:
+            data[day] -= cash_data[day]
+            cbr_data[day] -= cash_data[day]
+
+        self.show_charts(data, cbr_data)
+
+    def get_value_history(self, time_range, currency=RUB):
         changes = {
             'JE00B5BCW814': 'RU000A1025V3',
             'je00b5bcw814': 'ru000a1025v3',
@@ -72,10 +88,10 @@ class Portfolio:
         portfolio = defaultdict(int)
         operations = defaultdict(list)
         orders_range = TimeRange(None, time_range.end_time)
-        stock_orders = OrdersManager.get_orders(self.portfolio_id,
-                                                orders_range)
-        money_orders = MoneyManager.get_operations(self.portfolio_id,
-                                                   orders_range)
+        stock_orders = OrdersManager.get_orders(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        money_orders = MoneyManager.get_operations(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
         all_orders = stock_orders + money_orders
         all_orders.sort(key=lambda x: x[0])
 
@@ -154,7 +170,14 @@ class Portfolio:
 
                     portfolio_sum += c1 * c2 * quantity
 
-            value[date] = portfolio_sum
+            if currency == self.USD:
+                c3 = usd.get(date, prev_price[self.USD])
+            elif currency == self.EUR:
+                c3 = eur.get(date, prev_price[self.EUR])
+            else:
+                c3 = 1
+
+            value[date] = portfolio_sum / c3
         return value
 
     def get_value(self):
@@ -167,10 +190,10 @@ class Portfolio:
         eur = QuotesLoader.current(self.EUR)
 
         orders_range = TimeRange(None, datetime.now())
-        stock_orders = OrdersManager.get_orders(self.portfolio_id,
-                                                orders_range)
-        money_orders = MoneyManager.get_operations(self.portfolio_id,
-                                                   orders_range)
+        stock_orders = OrdersManager.get_orders(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        money_orders = MoneyManager.get_operations(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
         all_orders = stock_orders + money_orders
         all_orders.sort(key=lambda x: x[0])
 
@@ -218,10 +241,10 @@ class Portfolio:
                 portfolio_sum += c1 * c2 * quantity
         return portfolio_sum
 
-    def get_cbr_history(self, time_range):
+    def get_cbr_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)
-        money_orders = MoneyManager.get_operations(self.portfolio_id,
-                                                   money_range)
+        money_orders = MoneyManager.get_operations(
+            self.portfolio_id, money_range, broker_id=self.broker_id)
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
         usd = QuotesManager.get_quotes(self.USD, cur_range)
@@ -240,6 +263,7 @@ class Portfolio:
                 raise ValueError(order.cur)
             operations[order.date].append(c * order.sum)
 
+        prev_price = {}
         cash = OrderedDict()
         rate = CBR_BASE_RATE
         s = prev = proc = 0
@@ -248,8 +272,21 @@ class Portfolio:
             rate = CBR_RATE.get(date, rate)
             pr = rate / 100 / 365.5
             proc += prev * pr
+
+            if date in usd:
+                prev_price[self.USD] = usd[date]
+            if date in eur:
+                prev_price[self.EUR] = eur[date]
+
             if date >= time_range.start:
-                cash[date] = s + proc
+                if currency == self.USD:
+                    c3 = usd.get(date, prev_price[self.USD])
+                elif currency == self.EUR:
+                    c3 = eur.get(date, prev_price[self.EUR])
+                else:
+                    c3 = 1
+
+                cash[date] = (s + proc) / c3
             proc += proc * pr
             prev = s
         return cash
@@ -263,10 +300,10 @@ class Portfolio:
             date += timedelta(days=1)
         return dates
 
-    def get_cash_history(self, time_range):
+    def get_cash_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)
-        money_orders = MoneyManager.get_operations(self.portfolio_id,
-                                                   money_range)
+        money_orders = MoneyManager.get_operations(
+            self.portfolio_id, money_range, broker_id=self.broker_id)
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
         usd = QuotesManager.get_quotes(self.USD, cur_range)
@@ -285,14 +322,28 @@ class Portfolio:
                 raise ValueError(order.cur)
             operations[order.date].append(c * order.sum)
 
+        prev_price = {}
         cash = OrderedDict()
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
+
+            if date in usd:
+                prev_price[self.USD] = usd[date]
+            if date in eur:
+                prev_price[self.EUR] = eur[date]
+
             if date < time_range.start:
                 continue
 
-            cash[date] = s
+            if currency == self.USD:
+                c3 = usd.get(date, prev_price[self.USD])
+            elif currency == self.EUR:
+                c3 = eur.get(date, prev_price[self.EUR])
+            else:
+                c3 = 1
+
+            cash[date] = s / c3
         return cash
 
     def show_charts(self, *args):
@@ -302,9 +353,12 @@ class Portfolio:
 
         d1 = next(iter(args[0]))
         d2 = next(reversed(args[0]))
+        print(args[0][d2])
 
         for data in args:
-            ax.plot(t, data.values())
+            if isinstance(data, dict):
+                data = data.values()
+            ax.plot(t, data)
 
         ax.grid()
         ax.set_title(f'{d1[0]}-{d1[1]}-{d1[2]} - {d2[0]}-{d2[1]}-{d2[2]}')

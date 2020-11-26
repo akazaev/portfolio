@@ -10,8 +10,7 @@ _CLIENT = None
 def get_client():
     global _CLIENT
     if not _CLIENT:
-        client = MongoClient(MONGO_URL)
-        _CLIENT = client
+        _CLIENT = MongoClient(MONGO_URL)
     return _CLIENT
 
 
@@ -39,27 +38,28 @@ class DBManager:
         assert isinstance(key, dict)
         data = data or key
         assert isinstance(data, dict)
-        with get_client() as client:
-            db = client.market
-            response = db[cls.collection].update(key, {'$set': data},
-                                                 upsert=True)
-            if response.get('nModified'):
-                print(data)
+
+        client = get_client()
+        db = client.market
+        response = db[cls.collection].update(key, {'$set': data},
+                                             upsert=True)
+        if response.get('nModified'):
+            print(data)
 
     @classmethod
     def insert(cls, data=None):
-        with get_client() as client:
-            db = client.market
-            if isinstance(data, dict):
-                db[cls.collection].insert(data)
-            if isinstance(data, list):
-                db[cls.collection].insert_many(data)
+        client = get_client()
+        db = client.market
+        if isinstance(data, dict):
+            db[cls.collection].insert(data)
+        if isinstance(data, list):
+            db[cls.collection].insert_many(data)
 
     @classmethod
     def clear(cls):
-        with get_client() as client:
-            db = client.market
-            db[cls.collection].drop()
+        client = get_client()
+        db = client.market
+        db[cls.collection].drop()
 
     @classmethod
     def get(cls, **kwargs):
@@ -78,16 +78,17 @@ class DBManager:
 
         if sort and not isinstance(sort, list):
             sort = [sort]
-        with get_client() as client:
-            db = client.market
-            if first:
-                response = db[cls.collection].find_one(kwargs)
+
+        client = get_client()
+        db = client.market
+        if first:
+            response = db[cls.collection].find_one(kwargs)
+        else:
+            if fields:
+                response = db[cls.collection].find(kwargs, fields)
             else:
-                if fields:
-                    response = db[cls.collection].find(kwargs, fields)
-                else:
-                    response = db[cls.collection].find(kwargs)
-            if sort:
-                response = response.sort([(field, ASCENDING)
-                                          for field in sort])
-            return response
+                response = db[cls.collection].find(kwargs)
+        if sort:
+            response = response.sort([(field, ASCENDING)
+                                      for field in sort])
+        return response

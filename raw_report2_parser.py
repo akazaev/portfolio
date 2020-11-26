@@ -23,7 +23,8 @@ def parse_line(line):
     date1 = line[0].rstrip('"').lstrip('"').replace('  ', ' ')
     date1 = datetime.datetime.strptime(date1, '%d.%m.%Y %H:%M:%S')
     date2 = line[1].rstrip('"').lstrip('"').replace('  ', ' ')
-    date2 = datetime.datetime.strptime(date2, '%d.%m.%Y %H:%M:%S')
+    #date2 = datetime.datetime.strptime(date2, '%d.%m.%Y %H:%M:%S')
+    date2 = None
 
     market = line[5].rstrip('"').lstrip('"').replace('  ', ' ')
     assert market in MARKETS
@@ -82,8 +83,8 @@ report = []
 state = None
 for line in raw:
     line = line[1:]
-    if 'Незавершенные' in line[0]:
-        break
+    #if 'Незавершенные' in line[0]:
+    #    break
 
     if 'Дата заключен' in line[0] and state is None:
         state = States.STOCK
@@ -95,16 +96,25 @@ for line in raw:
         line = parse_line(line)
         report.append(line)
 
+        if line.date1 < datetime.datetime(2020, 11, 13):
+            continue
+
         if line.market != 'MBV':
             orders_save.append({
                 'portfolio': 1,
                 'date': line.date1,
                 'market': line.market,
-                'isin': line.isin, 'quantity': line.quantity,
-                'price': line.price, 'sum': line.sum,
-                'cur': line.cur})
+                'isin': line.isin,
+                'quantity': line.quantity,
+                'price': line.price,
+                'sum': line.sum,
+                'cur': line.cur,
+                'broker': 1})
 
-clear('orders')
+
+import pprint
+pprint.pprint(orders_save)
+#clear('orders')
 insert('orders', orders_save)
 
 

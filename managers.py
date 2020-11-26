@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from collections import OrderedDict, namedtuple
 from functools import lru_cache
 
@@ -12,7 +12,13 @@ class QuotesManager(DBManager):
     @classmethod
     @lru_cache(maxsize=None)
     def get_quotes(cls, isin, time_range):
-        data = cls.get(isin=isin, time=time_range, sort='time',
+        today = date_to_key(datetime.now())
+        new_range = time_range
+        if time_range.end == today:
+            pre = time_range.end_time - timedelta(days=1)
+            new_range = TimeRange(time_range.start_time, pre)
+
+        data = cls.get(isin=isin, time=new_range, sort='time',
                        fields={'time': 1, 'price': 1})
         result = OrderedDict()
         last = None
@@ -20,18 +26,26 @@ class QuotesManager(DBManager):
             result[date_to_key(record['time'])] = record['price']
             last = record
         last_date = last['time'] if last else time_range.start_time
-        if date_to_key(last_date) < time_range.end:
+
+        if date_to_key(last_date) < new_range.end:
             if last is not None:
                 last_date += timedelta(days=1)
-            time_range = TimeRange(last_date, time_range.end_time)
-            data = QuotesLoader.history(isin, time_range)
+                last_date = last_date.replace(hour=0, minute=0, second=0)
+            new_range = TimeRange(last_date, new_range.end_time)
+            data = QuotesLoader.history(isin, new_range)
+            assert data
             cls.insert(data)
             for record in data:
                 if date_to_key(record['time']) > time_range.end:
                     break
                 result[date_to_key(record['time'])] = record['price']
                 last = record
-        assert date_to_key(last['time']) == time_range.end
+
+        assert date_to_key(last['time']) == new_range.end
+        if time_range.end == today:
+            price = QuotesLoader.current(isin)
+            result[today] = price
+
         return result
 
 
@@ -44,8 +58,12 @@ class MoneyManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_operations(cls, portfolio_id, time_range):
-        data = cls.get(portfolio=portfolio_id, date=time_range, sort='time')
+    def get_operations(cls, portfolio_id, time_range, broker_id=None):
+        filters = {'portfolio': portfolio_id, 'date': time_range,
+                   'sort': 'time'}
+        if broker_id:
+            filters['broker'] = broker_id
+        data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
                           sum=row['sum']) for row in data]
         return data
@@ -60,8 +78,12 @@ class OrdersManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_orders(cls, portfolio_id, time_range):
-        data = cls.get(portfolio=portfolio_id, date=time_range, sort='time')
+    def get_orders(cls, portfolio_id, time_range, broker_id=None):
+        filters = {'portfolio': portfolio_id, 'date': time_range,
+                   'sort': 'time'}
+        if broker_id:
+            filters['broker'] = broker_id
+        data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), isin=row['isin'],
                           quantity=row['quantity'], sum=row['sum'],
                           cur=row['cur']) for row in data]
