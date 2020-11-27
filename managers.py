@@ -33,15 +33,13 @@ class QuotesManager(DBManager):
                 last_date = last_date.replace(hour=0, minute=0, second=0)
             new_range = TimeRange(last_date, new_range.end_time)
             data = QuotesLoader.history(isin, new_range)
-            assert data
-            cls.insert(data)
-            for record in data:
-                if date_to_key(record['time']) > time_range.end:
-                    break
-                result[date_to_key(record['time'])] = record['price']
-                last = record
+            if data:
+                cls.insert(data)
+                for record in data:
+                    if date_to_key(record['time']) > new_range.end:
+                        break
+                    result[date_to_key(record['time'])] = record['price']
 
-        assert date_to_key(last['time']) == new_range.end
         if time_range.end == today:
             price = QuotesLoader.current(isin)
             result[today] = price
