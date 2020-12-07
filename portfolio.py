@@ -19,6 +19,7 @@ class Portfolio:
     RUB = 'RUB'
     USD = 'USD'
     EUR = 'EUR'
+    CURRENCIES = (RUB, USD, EUR, )
 
     def __init__(self, portfolio_id, broker_id=None):
         self.portfolio_id = portfolio_id
@@ -186,8 +187,15 @@ class Portfolio:
             'je00b5bcw814': 'ru000a1025v3',
         }
 
+        usd_based = (
+            'IE00BD3QJ757',  # FXIT
+            'IE00BD3QHZ91',  # FXUS
+        )
+
         usd = QuotesLoader.current(self.USD)
         eur = QuotesLoader.current(self.EUR)
+
+        by_cur = defaultdict(int)
 
         orders_range = TimeRange(None, datetime.now())
         stock_orders = OrdersManager.get_orders(
@@ -205,22 +213,37 @@ class Portfolio:
             if isinstance(order, Order):
                 isin = order.isin
                 quantity = order.quantity
-                portfolio[(isin, cur)] += quantity
+                if quantity < 0 and not portfolio[(isin, cur)]:
+                    q = abs(quantity)
+                    for tcur in self.CURRENCIES:
+                        if not portfolio[(isin, tcur)]:
+                            continue
+                        sub = min(portfolio[(isin, tcur)], q)
+                        portfolio[(isin, tcur)] -= sub
+                        q -= sub
+                    if q:
+                        raise ValueError()
+                else:
+                    portfolio[(isin, cur)] += quantity
                 portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
             if isinstance(order, Money):
                 portfolio[(cur, cur)] += sum
 
         portfolio_sum = 0
+        active_sum = 0
         for key, quantity in portfolio.items():
+            if not quantity:
+                continue
             isin, cur = key
+
             if isin == self.RUB:
-                portfolio_sum += quantity
+                position = quantity
             elif isin == self.USD:
                 c = usd
-                portfolio_sum += c * quantity
+                position = c * quantity
             elif isin == self.EUR:
                 c = eur
-                portfolio_sum += c * quantity
+                position = c * quantity
             else:
                 if isin in changes:
                     isin = changes[isin]
@@ -238,8 +261,24 @@ class Portfolio:
                 else:
                     raise ValueError(cur)
 
-                portfolio_sum += c1 * c2 * quantity
-        return portfolio_sum
+                position = c1 * c2 * quantity
+            portfolio_sum += position
+            if key[0] != key[1]:
+                active_sum += position
+
+            if isin in usd_based:
+                cur = self.USD
+            by_cur[cur] += position
+
+        for key in by_cur:
+            by_cur[key] = by_cur[key] / portfolio_sum * 100
+
+        cash = {}
+        for key in portfolio:
+            if key[0] == key[1]:
+                cash[key[0]] = portfolio[key]
+
+        return portfolio_sum, active_sum, by_cur, cash
 
     def get_cbr_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)

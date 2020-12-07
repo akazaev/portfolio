@@ -67,11 +67,9 @@ class QuotesLoader:
             'EUR': ('EUR_RUB__TOD', 'EUR_RUB__TOM',),
         }
         if isin in currencies:
-            last, active = cls._get_iss_data(currencies[isin][0])
-            if not active:
-                last, active = cls._get_iss_data(currencies[isin][1])
-                if not active:
-                    raise ValueError()
+            last, _active = cls._get_iss_data(currencies[isin][0])
+            if not _active:
+                last, _active = cls._get_iss_data(currencies[isin][1])
         else:
             last = cls._get_broker_data(isin)
         return last
