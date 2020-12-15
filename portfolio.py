@@ -2,12 +2,12 @@ from functools import lru_cache
 import builtins
 
 from base import date_to_key, key_to_date
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 
-from base import TimeRange
+from base import TimeRange, Value, ValueList
 from config import CBR_RATE, CBR_BASE_RATE
 from loaders import QuotesLoader
 from managers import (
@@ -54,9 +54,7 @@ class Portfolio:
         assert len(data) == len(cash_data)
         assert len(data) == len(dividend_data)
 
-        for day in data:
-            dividend_data[day] += data[day]
-
+        dividend_data = dividend_data + data
         self.show_charts(data, cbr_data, cash_data, dividend_data)
 
     def chart_profit(self, start_date, end_date, currency=RUB):
@@ -75,9 +73,8 @@ class Portfolio:
         assert len(data) == len(cash_data)
         assert len(data) == len(dividend_data)
 
-        for day in cash_data:
-            data[day] -= cash_data[day]
-            cbr_data[day] -= cash_data[day]
+        data = data - cash_data
+        cbr_data = cbr_data - cash_data
 
         self.show_charts(data, cbr_data, dividend_data)
 
@@ -90,7 +87,7 @@ class Portfolio:
         usd = QuotesManager.get_quotes(self.USD, time_range)
         eur = QuotesManager.get_quotes(self.EUR, time_range)
 
-        value = {}
+        value = ValueList()
         prev_price = {}
 
         portfolio = defaultdict(int)
@@ -185,7 +182,10 @@ class Portfolio:
             else:
                 c3 = 1
 
-            value[date] = portfolio_sum / c3
+            day_value = Value()
+            day_value.key = date
+            day_value.value = portfolio_sum / c3
+            value.append(day_value)
         return value
 
     def get_value(self):
@@ -312,7 +312,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = OrderedDict()
+        cash = ValueList()
         rate = CBR_BASE_RATE
         s = prev = proc = 0
         for date in dates:
@@ -334,7 +334,10 @@ class Portfolio:
                 else:
                     c3 = 1
 
-                cash[date] = (s + proc) / c3
+                day_value = Value()
+                day_value.key = date
+                day_value.value = (s + proc) / c3
+                cash.append(day_value)
             proc += proc * pr
             prev = s
         return cash
@@ -371,7 +374,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = OrderedDict()
+        cash = ValueList()
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
@@ -391,7 +394,10 @@ class Portfolio:
             else:
                 c3 = 1
 
-            cash[date] = s / c3
+            day_value = Value()
+            day_value.key = date
+            day_value.value = s / c3
+            cash.append(day_value)
         return cash
 
     def get_dividend_history(self, time_range, currency=RUB):
@@ -417,7 +423,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = OrderedDict()
+        cash = ValueList()
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
@@ -437,7 +443,10 @@ class Portfolio:
             else:
                 c3 = 1
 
-            cash[date] = s / c3
+            day_value = Value()
+            day_value.key = date
+            day_value.value = s / c3
+            cash.append(day_value)
         return cash
 
     def show_charts(self, *args):
@@ -445,13 +454,11 @@ class Portfolio:
         fig, ax = plt.subplots()
         t = range(len(args[0]))
 
-        d1 = next(iter(args[0]))
-        d2 = next(reversed(args[0]))
-        print(args[0][d2])
+        d1 = args[0][0].key
+        d2 = args[0][-1].key
+        print(args[0][-1].value)
 
         for data in args:
-            if isinstance(data, dict):
-                data = data.values()
             ax.plot(t, data)
 
         ax.grid()

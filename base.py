@@ -22,6 +22,49 @@ def key_to_date(date):
     return datetime(date[0], date[1], date[2])
 
 
+class Value:
+    __slots__ = ('key', 'value')
+
+    def __float__(self):
+        return self.value
+
+
+class ValueList(list):
+    def __init__(self):
+        super(ValueList, self).__init__()
+        self.i = 0
+
+    def __add__(self, other):
+        result = ValueList()
+        for item1, item2 in zip(self, other):
+            if item1.key != item2.key:
+                raise ValueError('inconsistent lists')
+            value = Value()
+            value.key = item1.key
+            value.value = item1.value + item2.value
+            result.append(value)
+        return result
+
+    def __sub__(self, other):
+        result = ValueList()
+        for item1, item2 in zip(self, other):
+            if item1.key != item2.key:
+                raise ValueError('inconsistent lists')
+            value = Value()
+            value.key = item1.key
+            value.value = item1.value - item2.value
+            result.append(value)
+        return result
+
+    def __next__(self):
+        try:
+            r = self[self.i].value
+            self.i += 1
+        except KeyError:
+            raise StopIteration
+        return r
+
+
 class TimeRange:
     def __init__(self, start_time, end_time):
         self.start_time = start_time
