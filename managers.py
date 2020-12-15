@@ -104,3 +104,23 @@ class SecuritiesManager(DBManager):
             data = cls.get(isin=isin, first=True)
         assert data
         return data
+
+
+Dividend = namedtuple('Dividend', ['date', 'cur', 'sum'])
+
+
+class DividendManager(DBManager):
+    collection = 'dividends'
+    model = Dividend
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_dividends(cls, portfolio_id, time_range, broker_id=None):
+        filters = {'portfolio': portfolio_id, 'date': time_range,
+                   'sort': 'time'}
+        if broker_id:
+            filters['broker'] = broker_id
+        data = cls.get(**filters)
+        data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
+                          sum=row['sum']) for row in data]
+        return data
