@@ -336,41 +336,39 @@ class Portfolio:
 
         operations = defaultdict(list)
         for order in money_orders:
-            if order.cur == self.RUB:
-                c = 1
-            elif order.cur == self.USD:
-                c = usd[order.date]
-            elif order.cur == self.EUR:
-                c = eur[order.date]
-            else:
+            if order.cur not in self.CURRENCIES:
                 raise ValueError(order.cur)
-            operations[order.date].append(c * order.sum)
+            operations[order.date].append(order)
 
         prev_price = {}
         cash = ValueList(manager.collection)
         s = 0
         for date in dates:
-            s += builtins.sum(operations[date])
-
             if date in usd:
                 prev_price[self.USD] = usd[date]
             if date in eur:
                 prev_price[self.EUR] = eur[date]
 
-            if date < time_range.start:
-                continue
+            day_sum = 0
+            for order in operations[date]:
+                c1 = c2 = 1
+                if order.cur == self.USD:
+                    c1 = usd.get(date, prev_price[self.USD])
+                elif order.cur == self.EUR:
+                    c1 = eur.get(date, prev_price[self.EUR])
 
-            if currency == self.USD:
-                c3 = usd.get(date, prev_price[self.USD])
-            elif currency == self.EUR:
-                c3 = eur.get(date, prev_price[self.EUR])
-            else:
-                c3 = 1
+                if currency == self.USD:
+                    c2 = usd.get(date, prev_price[self.USD])
+                elif currency == self.EUR:
+                    c2 = eur.get(date, prev_price[self.EUR])
+                day_sum += order.sum * c1 / c2
+            s += day_sum
 
-            day_value = Value()
-            day_value.key = date
-            day_value.value = s / c3
-            cash.append(day_value)
+            if date >= time_range.start:
+                day_value = Value()
+                day_value.key = date
+                day_value.value = float(s)
+                cash.append(day_value)
         return cash
 
     def get_cash_history(self, time_range, currency=RUB):
