@@ -56,7 +56,7 @@ class MoneyManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_operations(cls, portfolio_id, time_range, broker_id=None):
+    def get_data(cls, portfolio_id, time_range, broker_id=None):
         filters = {'portfolio': portfolio_id, 'date': time_range,
                    'sort': 'time'}
         if broker_id:
@@ -76,7 +76,7 @@ class OrdersManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_orders(cls, portfolio_id, time_range, broker_id=None):
+    def get_data(cls, portfolio_id, time_range, broker_id=None):
         filters = {'portfolio': portfolio_id, 'date': time_range,
                    'sort': 'time'}
         if broker_id:
@@ -97,7 +97,7 @@ class SecuritiesManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_securities(cls, isin):
+    def get_data(cls, isin):
         if isin in cls.by_ticker:
             data = cls.get(ticker=cls.by_ticker[isin], first=True)
         else:
@@ -115,7 +115,7 @@ class DividendManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_dividends(cls, portfolio_id, time_range, broker_id=None):
+    def get_data(cls, portfolio_id, time_range, broker_id=None):
         filters = {'portfolio': portfolio_id, 'date': time_range,
                    'sort': 'time'}
         if broker_id:
@@ -135,7 +135,7 @@ class CommissionManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_commission(cls, portfolio_id, time_range, broker_id=None):
+    def get_data(cls, portfolio_id, time_range, broker_id=None):
         filters = {'portfolio': portfolio_id, 'date': time_range,
                    'sort': 'time'}
         if broker_id:

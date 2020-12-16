@@ -9,7 +9,7 @@ class QuotesLoader:
     @classmethod
     def history(cls, isin, time_range, interval='day'):
         from managers import SecuritiesManager
-        data = SecuritiesManager.get_securities(isin=isin)
+        data = SecuritiesManager.get_data(isin=isin)
         figi = data['figi']
         headers = {'Authorization': f'Bearer {API_TOKEN}'}
 
@@ -51,7 +51,7 @@ class QuotesLoader:
     @classmethod
     def _get_broker_data(cls, isin):
         from managers import SecuritiesManager
-        data = SecuritiesManager.get_securities(isin=isin)
+        data = SecuritiesManager.get_data(isin=isin)
         figi = data['figi']
         headers = {'Authorization': f'Bearer {API_TOKEN}'}
 

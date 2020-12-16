@@ -12,7 +12,7 @@ from config import CBR_RATE, CBR_BASE_RATE
 from loaders import QuotesLoader
 from managers import (
     QuotesManager, OrdersManager, MoneyManager, SecuritiesManager,
-    Order, Money, DividendManager)
+    Order, Money, DividendManager, CommissionManager)
 
 
 class Portfolio:
@@ -37,14 +37,17 @@ class Portfolio:
         cash_data = self.get_cash_history(time_range, currency=currency)
         dividend_data = self.get_dividend_history(time_range,
                                                   currency=currency)
+        commission_data = self.get_commission_history(time_range,
+                                                      currency=currency)
 
         assert len(data) == len(cbr_data)
         assert len(data) == len(cash_data)
         assert len(data) == len(dividend_data)
+        assert len(data) == len(commission_data)
 
         self.add_charts(dividend_data + data, cbr_data, cash_data, data)
         self.add_charts(data - cash_data, cbr_data - cash_data,
-                        dividend_data)
+                        dividend_data, commission_data)
         self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
@@ -62,9 +65,9 @@ class Portfolio:
         portfolio = defaultdict(int)
         operations = defaultdict(list)
         orders_range = TimeRange(None, time_range.end_time)
-        stock_orders = OrdersManager.get_orders(
+        stock_orders = OrdersManager.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        money_orders = MoneyManager.get_operations(
+        money_orders = MoneyManager.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         all_orders = stock_orders + money_orders
         all_orders.sort(key=lambda x: x[0])
@@ -130,7 +133,7 @@ class Portfolio:
                     else:
                         c1 = prev_price[isin]
 
-                    security = SecuritiesManager.get_securities(isin=isin)
+                    security = SecuritiesManager.get_data(isin=isin)
                     cur = security['currency']
 
                     if cur == self.RUB:
@@ -174,9 +177,9 @@ class Portfolio:
         by_cur = defaultdict(int)
 
         orders_range = TimeRange(None, datetime.now())
-        stock_orders = OrdersManager.get_orders(
+        stock_orders = OrdersManager.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        money_orders = MoneyManager.get_operations(
+        money_orders = MoneyManager.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         all_orders = stock_orders + money_orders
         all_orders.sort(key=lambda x: x[0])
@@ -226,7 +229,7 @@ class Portfolio:
                     isin = changes[isin]
                 c1 = QuotesLoader.current(isin)
 
-                security = SecuritiesManager.get_securities(isin=isin)
+                security = SecuritiesManager.get_data(isin=isin)
                 cur = security['currency']
 
                 if cur == self.RUB:
@@ -260,7 +263,7 @@ class Portfolio:
 
     def get_cbr_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)
-        money_orders = MoneyManager.get_operations(
+        money_orders = MoneyManager.get_data(
             self.portfolio_id, money_range, broker_id=self.broker_id)
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
@@ -311,112 +314,73 @@ class Portfolio:
             prev = s
         return cash
 
-    @lru_cache(maxsize=None)
     def get_dates(self, time_range):
-        dates = []
         date = time_range.start_time
         while date < time_range.end_time:
-            dates.append(date_to_key(date))
+            yield date_to_key(date)
             date += timedelta(days=1)
-        return dates
+
+    def _get_history(self, manager, time_range, currency):
+        money_range = TimeRange(None, time_range.end_time)
+        money_orders = manager.get_data(self.portfolio_id, money_range,
+                                        broker_id=self.broker_id)
+        cur_range = TimeRange(key_to_date(money_orders[0].date),
+                              time_range.end_time)
+        usd = QuotesManager.get_quotes(self.USD, cur_range)
+        eur = QuotesManager.get_quotes(self.EUR, cur_range)
+
+        dates_range = TimeRange(key_to_date(min(money_orders[0].date,
+                                                time_range.start)),
+                                time_range.end_time)
+        dates = self.get_dates(dates_range)
+
+        operations = defaultdict(list)
+        for order in money_orders:
+            if order.cur == self.RUB:
+                c = 1
+            elif order.cur == self.USD:
+                c = usd[order.date]
+            elif order.cur == self.EUR:
+                c = eur[order.date]
+            else:
+                raise ValueError(order.cur)
+            operations[order.date].append(c * order.sum)
+
+        prev_price = {}
+        cash = ValueList(manager.collection)
+        s = 0
+        for date in dates:
+            s += builtins.sum(operations[date])
+
+            if date in usd:
+                prev_price[self.USD] = usd[date]
+            if date in eur:
+                prev_price[self.EUR] = eur[date]
+
+            if date < time_range.start:
+                continue
+
+            if currency == self.USD:
+                c3 = usd.get(date, prev_price[self.USD])
+            elif currency == self.EUR:
+                c3 = eur.get(date, prev_price[self.EUR])
+            else:
+                c3 = 1
+
+            day_value = Value()
+            day_value.key = date
+            day_value.value = s / c3
+            cash.append(day_value)
+        return cash
 
     def get_cash_history(self, time_range, currency=RUB):
-        money_range = TimeRange(None, time_range.end_time)
-        money_orders = MoneyManager.get_operations(
-            self.portfolio_id, money_range, broker_id=self.broker_id)
-        cur_range = TimeRange(key_to_date(money_orders[0].date),
-                              time_range.end_time)
-        usd = QuotesManager.get_quotes(self.USD, cur_range)
-        eur = QuotesManager.get_quotes(self.EUR, cur_range)
-        dates = self.get_dates(cur_range)
-
-        operations = defaultdict(list)
-        for order in money_orders:
-            if order.cur == self.RUB:
-                c = 1
-            elif order.cur == self.USD:
-                c = usd[order.date]
-            elif order.cur == self.EUR:
-                c = eur[order.date]
-            else:
-                raise ValueError(order.cur)
-            operations[order.date].append(c * order.sum)
-
-        prev_price = {}
-        cash = ValueList('cash')
-        s = 0
-        for date in dates:
-            s += builtins.sum(operations[date])
-
-            if date in usd:
-                prev_price[self.USD] = usd[date]
-            if date in eur:
-                prev_price[self.EUR] = eur[date]
-
-            if date < time_range.start:
-                continue
-
-            if currency == self.USD:
-                c3 = usd.get(date, prev_price[self.USD])
-            elif currency == self.EUR:
-                c3 = eur.get(date, prev_price[self.EUR])
-            else:
-                c3 = 1
-
-            day_value = Value()
-            day_value.key = date
-            day_value.value = s / c3
-            cash.append(day_value)
-        return cash
+        return self._get_history(MoneyManager, time_range, currency)
 
     def get_dividend_history(self, time_range, currency=RUB):
-        money_range = TimeRange(None, time_range.end_time)
-        money_orders = DividendManager.get_dividends(
-            self.portfolio_id, money_range, broker_id=self.broker_id)
-        cur_range = TimeRange(key_to_date(money_orders[0].date),
-                              time_range.end_time)
-        usd = QuotesManager.get_quotes(self.USD, cur_range)
-        eur = QuotesManager.get_quotes(self.EUR, cur_range)
-        dates = self.get_dates(cur_range)
+        return self._get_history(DividendManager, time_range, currency)
 
-        operations = defaultdict(list)
-        for order in money_orders:
-            if order.cur == self.RUB:
-                c = 1
-            elif order.cur == self.USD:
-                c = usd[order.date]
-            elif order.cur == self.EUR:
-                c = eur[order.date]
-            else:
-                raise ValueError(order.cur)
-            operations[order.date].append(c * order.sum)
-
-        prev_price = {}
-        cash = ValueList('dividend')
-        s = 0
-        for date in dates:
-            s += builtins.sum(operations[date])
-
-            if date in usd:
-                prev_price[self.USD] = usd[date]
-            if date in eur:
-                prev_price[self.EUR] = eur[date]
-
-            if date < time_range.start:
-                continue
-
-            if currency == self.USD:
-                c3 = usd.get(date, prev_price[self.USD])
-            elif currency == self.EUR:
-                c3 = eur.get(date, prev_price[self.EUR])
-            else:
-                c3 = 1
-
-            day_value = Value()
-            day_value.key = date
-            day_value.value = s / c3
-            cash.append(day_value)
-        return cash
+    def get_commission_history(self, time_range, currency=RUB):
+        return self._get_history(CommissionManager, time_range, currency)
 
     def add_charts(self, *args):
         assert args
@@ -432,7 +396,10 @@ class Portfolio:
         legend = []
         plots = []
         for data in args:
-            plots.append(ax.plot(t, data)[0])
+            plot = ax.plot(t, data)[0]
+            plots.append(plot)
+            value = str(round(data[-1].value, 2))
+            ax.text(t[-1], data[-1].value, value)
             legend.append(data.title)
 
         ax.grid()

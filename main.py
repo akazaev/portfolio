@@ -15,4 +15,4 @@ end_date = datetime(2020, 12, 14)
 #end_date = datetime.now()
 
 #pprint(portfolio.get_value())
-portfolio.chart(start_date, end_date, currency=Portfolio.USD)
+portfolio.chart(start_date, end_date, currency=Portfolio.RUB)

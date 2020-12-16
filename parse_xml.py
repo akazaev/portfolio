@@ -36,7 +36,6 @@ def parse_record(record):
         volume = get(cur, 'p_code').attrib.get('volume')
         if volume:
             cur_code = get(cur, 'p_code').attrib['p_code']
-            print(volume, cur_code, comment)
             time = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
             return time, abs(float(volume)), cur_code
     raise ValueError('unable to parse')
@@ -64,6 +63,7 @@ for day in collection:
                 DividendManager.upsert(data)
         elif oper_type == 'Комиссия':
             time, volume, cur_code = parse_record(record)
+            print(volume, cur_code, comment)
             data = {
                 'portfolio': 1,
                 'sum': volume,
