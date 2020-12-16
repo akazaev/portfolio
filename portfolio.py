@@ -25,20 +25,7 @@ class Portfolio:
         self.portfolio_id = portfolio_id
         self.broker_id = broker_id
 
-    def cbr(self, start_date, end_date):
-        assert isinstance(start_date, datetime)
-        assert isinstance(end_date, datetime)
-        end_date = end_date.replace(hour=23, minute=59, second=59)
-        time_range = TimeRange(start_date, end_date)
-
-        data = self.get_value_history(time_range)
-        cbr_data = self.get_cbr_history(time_range)
-        cash_data = self.get_cash_history(time_range)
-
-        assert len(data) == len(cbr_data)
-        assert len(data) == len(cash_data)
-
-    def chart_cbr(self, start_date, end_date, currency=RUB):
+    def chart(self, start_date, end_date, currency=RUB):
         assert isinstance(start_date, datetime)
         assert isinstance(end_date, datetime)
         start_date = start_date.replace(hour=0, minute=0, second=0)
@@ -48,35 +35,17 @@ class Portfolio:
         data = self.get_value_history(time_range, currency=currency)
         cbr_data = self.get_cbr_history(time_range, currency=currency)
         cash_data = self.get_cash_history(time_range, currency=currency)
-        dividend_data = self.get_dividend_history(time_range)
+        dividend_data = self.get_dividend_history(time_range,
+                                                  currency=currency)
 
         assert len(data) == len(cbr_data)
         assert len(data) == len(cash_data)
         assert len(data) == len(dividend_data)
 
-        dividend_data = dividend_data + data
-        self.show_charts(data, cbr_data, cash_data, dividend_data)
-
-    def chart_profit(self, start_date, end_date, currency=RUB):
-        assert isinstance(start_date, datetime)
-        assert isinstance(end_date, datetime)
-        start_date = start_date.replace(hour=0, minute=0, second=0)
-        end_date = end_date.replace(hour=23, minute=59, second=59)
-        time_range = TimeRange(start_date, end_date)
-
-        data = self.get_value_history(time_range, currency=currency)
-        cbr_data = self.get_cbr_history(time_range, currency=currency)
-        cash_data = self.get_cash_history(time_range, currency=currency)
-        dividend_data = self.get_dividend_history(time_range)
-
-        assert len(data) == len(cbr_data)
-        assert len(data) == len(cash_data)
-        assert len(data) == len(dividend_data)
-
-        data = data - cash_data
-        cbr_data = cbr_data - cash_data
-
-        self.show_charts(data, cbr_data, dividend_data)
+        self.add_charts(dividend_data + data, cbr_data, cash_data, data)
+        self.add_charts(data - cash_data, cbr_data - cash_data,
+                        dividend_data)
+        self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
         changes = {
@@ -87,7 +56,7 @@ class Portfolio:
         usd = QuotesManager.get_quotes(self.USD, time_range)
         eur = QuotesManager.get_quotes(self.EUR, time_range)
 
-        value = ValueList()
+        value = ValueList('value')
         prev_price = {}
 
         portfolio = defaultdict(int)
@@ -312,7 +281,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = ValueList()
+        cash = ValueList('cbr')
         rate = CBR_BASE_RATE
         s = prev = proc = 0
         for date in dates:
@@ -374,7 +343,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = ValueList()
+        cash = ValueList('cash')
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
@@ -423,7 +392,7 @@ class Portfolio:
             operations[order.date].append(c * order.sum)
 
         prev_price = {}
-        cash = ValueList()
+        cash = ValueList('dividend')
         s = 0
         for date in dates:
             s += builtins.sum(operations[date])
@@ -449,18 +418,26 @@ class Portfolio:
             cash.append(day_value)
         return cash
 
-    def show_charts(self, *args):
+    def add_charts(self, *args):
         assert args
-        fig, ax = plt.subplots()
+
+        figure = plt.figure()
+        ax = figure.add_subplot()
+
         t = range(len(args[0]))
 
         d1 = args[0][0].key
         d2 = args[0][-1].key
-        print(args[0][-1].value)
 
+        legend = []
+        plots = []
         for data in args:
-            ax.plot(t, data)
+            plots.append(ax.plot(t, data)[0])
+            legend.append(data.title)
 
         ax.grid()
+        ax.legend(plots, legend)
         ax.set_title(f'{d1[0]}-{d1[1]}-{d1[2]} - {d2[0]}-{d2[1]}-{d2[2]}')
+
+    def show_charts(self):
         plt.show()

@@ -30,12 +30,13 @@ class Value:
 
 
 class ValueList(list):
-    def __init__(self):
+    def __init__(self, title):
         super(ValueList, self).__init__()
         self.i = 0
+        self.title = title
 
     def __add__(self, other):
-        result = ValueList()
+        result = ValueList(f'{self.title}+{other.title}')
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
                 raise ValueError('inconsistent lists')
@@ -46,7 +47,7 @@ class ValueList(list):
         return result
 
     def __sub__(self, other):
-        result = ValueList()
+        result = ValueList(f'{self.title}-{other.title}')
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
                 raise ValueError('inconsistent lists')

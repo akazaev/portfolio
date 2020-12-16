@@ -124,3 +124,23 @@ class DividendManager(DBManager):
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
                           sum=row['sum']) for row in data]
         return data
+
+
+Commission = namedtuple('Commission', ['date', 'cur', 'sum'])
+
+
+class CommissionManager(DBManager):
+    collection = 'commission'
+    model = Commission
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_commission(cls, portfolio_id, time_range, broker_id=None):
+        filters = {'portfolio': portfolio_id, 'date': time_range,
+                   'sort': 'time'}
+        if broker_id:
+            filters['broker'] = broker_id
+        data = cls.get(**filters)
+        data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
+                          sum=row['sum']) for row in data]
+        return data
