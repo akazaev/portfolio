@@ -189,7 +189,6 @@ class Portfolio:
         portfolio = defaultdict(int)
 
         for order in all_orders:
-            print(order)
             cur = order.cur
             sum = order.sum
             if isinstance(order, Order):
@@ -245,7 +244,6 @@ class Portfolio:
 
                 position = c1 * c2 * quantity
             portfolio_sum += position
-            print(position, key)
             if key[0] != key[1]:
                 active_sum += position
 
@@ -262,6 +260,86 @@ class Portfolio:
                 cash[key[0]] = portfolio[key]
 
         return portfolio_sum, active_sum, by_cur, cash
+
+    def get_state(self):
+        changes = {
+            'JE00B5BCW814': 'RU000A1025V3',
+            'je00b5bcw814': 'ru000a1025v3',
+        }
+
+        usd = QuotesLoader.current(self.USD)
+        eur = QuotesLoader.current(self.EUR)
+
+        orders_range = TimeRange(None, datetime.now())
+        stock_orders = OrdersManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        money_orders = MoneyManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        all_orders = stock_orders + money_orders
+        all_orders.sort(key=lambda x: x[0])
+
+        portfolio = defaultdict(int)
+
+        for order in all_orders:
+            cur = order.cur
+            sum = order.sum
+            if isinstance(order, Order):
+                isin = order.isin
+                quantity = order.quantity
+                if quantity < 0 and not portfolio[(isin, cur)]:
+                    q = abs(quantity)
+                    for tcur in self.CURRENCIES:
+                        if not portfolio[(isin, tcur)]:
+                            continue
+                        sub = min(portfolio[(isin, tcur)], q)
+                        portfolio[(isin, tcur)] -= sub
+                        q -= sub
+                    if q:
+                        raise ValueError()
+                else:
+                    portfolio[(isin, cur)] += quantity
+                portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
+            if isinstance(order, Money):
+                portfolio[(cur, cur)] += sum
+
+        state = {}
+        for key, quantity in portfolio.items():
+            if not quantity:
+                continue
+            isin, cur = key
+            ticker = name = isin
+
+            if isin == self.RUB:
+                position = quantity
+            elif isin == self.USD:
+                c = usd
+                position = c * quantity
+            elif isin == self.EUR:
+                c = eur
+                position = c * quantity
+            else:
+                if isin in changes:
+                    isin = changes[isin]
+                c1 = QuotesLoader.current(isin)
+
+                security = SecuritiesManager.get_data(isin=isin)
+                cur = security['currency']
+                ticker = security['ticker']
+                name = security['name']
+
+                if cur == self.RUB:
+                    c2 = 1
+                elif cur == self.USD:
+                    c2 = usd
+                elif cur == self.EUR:
+                    c2 = eur
+                else:
+                    raise ValueError(cur)
+
+                position = c1 * c2 * quantity
+
+            state[(ticker, name)] = (quantity, builtins.round(position, 2))
+        return state
 
     def get_cbr_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)
@@ -293,6 +371,7 @@ class Portfolio:
             s += builtins.sum(operations[date])
             rate = CBR_RATE.get(date, rate)
             pr = rate / 100 / 365.5
+            proc += proc * pr
             proc += prev * pr
 
             if date in usd:
@@ -312,7 +391,7 @@ class Portfolio:
                 day_value.key = date
                 day_value.value = (s + proc) / c3
                 cash.append(day_value)
-            proc += proc * pr
+
             prev = s
         return cash
 
@@ -411,11 +490,11 @@ class Portfolio:
         if minv < 0:
             major_ticks = list(range(0, minv, -step))
             major_ticks.extend(range(0, maxv, step))
-            minor_ticks = list(range(0, minv, -sub_ste))
-            minor_ticks.extend(range(0, maxv, sub_ste))
+            minor_ticks = list(range(0, minv - sub_ste, -sub_ste))
+            minor_ticks.extend(range(0, maxv + sub_ste, sub_ste))
         else:
             major_ticks = range(minv, maxv, step)
-            minor_ticks = range(minv, maxv, sub_ste)
+            minor_ticks = range(minv - sub_ste, maxv + sub_ste, sub_ste)
 
         ax.set_yticks(major_ticks)
         ax.set_yticks(minor_ticks, minor=True)
