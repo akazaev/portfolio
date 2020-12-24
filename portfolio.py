@@ -1,4 +1,3 @@
-from functools import lru_cache
 import builtins
 
 from base import date_to_key, key_to_date
@@ -45,9 +44,12 @@ class Portfolio:
         assert len(data) == len(dividend_data)
         assert len(data) == len(commission_data)
 
-        self.add_charts(dividend_data + data, cbr_data, cash_data, data)
+        self.add_charts(dividend_data + data, cbr_data, cash_data, data,
+                        step=50000)
         self.add_charts(data - cash_data, cbr_data - cash_data,
                         dividend_data, commission_data)
+        self.add_charts(100 * (data - cash_data) / cash_data,
+                        100 * (cbr_data - cash_data) / cash_data, step=10)
         self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
@@ -380,16 +382,16 @@ class Portfolio:
     def get_commission_history(self, time_range, currency=RUB):
         return self._get_history(CommissionManager, time_range, currency)
 
-    def add_charts(self, *args):
+    def add_charts(self, *args, step=10000):
         assert args
-
         figure = plt.figure()
         ax = figure.add_subplot()
 
         t = range(len(args[0]))
-
         d1 = args[0][0].key
         d2 = args[0][-1].key
+        minv = None
+        maxv = None
 
         legend = []
         plots = []
@@ -399,8 +401,27 @@ class Portfolio:
             value = str(round(data[-1].value, 2))
             ax.text(t[-1], data[-1].value, value)
             legend.append(data.title)
+            minv = data.min if minv is None else min(minv, data.min)
+            maxv = data.max if maxv is None else max(maxv, data.max)
 
-        ax.grid()
+        step = int(step)
+        sub_ste = int(step / 5)
+        minv = int(minv)
+        maxv = int(maxv)
+        if minv < 0:
+            major_ticks = list(range(0, minv, -step))
+            major_ticks.extend(range(0, maxv, step))
+            minor_ticks = list(range(0, minv, -sub_ste))
+            minor_ticks.extend(range(0, maxv, sub_ste))
+        else:
+            major_ticks = range(minv, maxv, step)
+            minor_ticks = range(minv, maxv, sub_ste)
+
+        ax.set_yticks(major_ticks)
+        ax.set_yticks(minor_ticks, minor=True)
+
+        ax.grid(which='minor', alpha=0.5)
+        ax.grid(which='major', alpha=0.8)
         ax.legend(plots, legend)
         ax.set_title(f'{d1[0]}-{d1[1]}-{d1[2]} - {d2[0]}-{d2[1]}-{d2[2]}')
 

@@ -34,8 +34,26 @@ class ValueList(list):
         super(ValueList, self).__init__()
         self.i = 0
         self.title = title
+        self._min = None
+        self._max = None
+
+    def append(self, object):
+        if self._min is None or object.value < self._min:
+            self._min = object.value
+        if self._max is None or object.value > self._max:
+            self._max = object.value
+        super().append(object)
+
+    @property
+    def min(self):
+        return self._min
+
+    @property
+    def max(self):
+        return self._max
 
     def __add__(self, other):
+        assert isinstance(other, ValueList)
         result = ValueList(f'{self.title}+{other.title}')
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
@@ -47,6 +65,7 @@ class ValueList(list):
         return result
 
     def __sub__(self, other):
+        assert isinstance(other, ValueList)
         result = ValueList(f'{self.title}-{other.title}')
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
@@ -54,6 +73,28 @@ class ValueList(list):
             value = Value()
             value.key = item1.key
             value.value = item1.value - item2.value
+            result.append(value)
+        return result
+
+    def __truediv__(self, other):
+        assert isinstance(other, ValueList)
+        result = ValueList(f'{self.title}/{other.title}')
+        for item1, item2 in zip(self, other):
+            if item1.key != item2.key:
+                raise ValueError('inconsistent lists')
+            value = Value()
+            value.key = item1.key
+            value.value = round(item1.value / item2.value, 3)
+            result.append(value)
+        return result
+
+    def __rmul__(self, other):
+        assert isinstance(other, (int, float))
+        result = ValueList(f'{other}*{self.title}')
+        for item1 in self:
+            value = Value()
+            value.key = item1.key
+            value.value = other * item1.value
             result.append(value)
         return result
 
