@@ -4,6 +4,7 @@ from base import date_to_key, key_to_date
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from tabulate import tabulate
 import matplotlib.pyplot as plt
 
 from base import TimeRange, Value, ValueList
@@ -302,15 +303,17 @@ class Portfolio:
             if isinstance(order, Money):
                 portfolio[(cur, cur)] += sum
 
-        state = {}
+        state = []
         for key, quantity in portfolio.items():
             if not quantity:
                 continue
             isin, cur = key
             ticker = name = isin
+            sec_cur = isin
+            position_orig = quantity
 
             if isin == self.RUB:
-                position = quantity
+                position = position_orig = quantity
             elif isin == self.USD:
                 c = usd
                 position = c * quantity
@@ -323,22 +326,28 @@ class Portfolio:
                 c1 = QuotesLoader.current(isin)
 
                 security = SecuritiesManager.get_data(isin=isin)
-                cur = security['currency']
+                sec_cur = security['currency']
                 ticker = security['ticker']
                 name = security['name']
 
-                if cur == self.RUB:
+                if sec_cur == self.RUB:
                     c2 = 1
-                elif cur == self.USD:
+                elif sec_cur == self.USD:
                     c2 = usd
-                elif cur == self.EUR:
+                elif sec_cur == self.EUR:
                     c2 = eur
                 else:
-                    raise ValueError(cur)
+                    raise ValueError(sec_cur)
 
                 position = c1 * c2 * quantity
+                position_orig = c1 * quantity
 
-            state[(ticker, name)] = (quantity, builtins.round(position, 2))
+            position = builtins.round(position, 2)
+            position_orig = builtins.round(position_orig, 2)
+            state.append([ticker, name, quantity, sec_cur,
+                          position_orig, position])
+        state = tabulate(state, headers=["Ticker","Name", "Quantity", "Cur",
+                                         "Sum", "Sum (rub)"])
         return state
 
     def get_cbr_history(self, time_range, currency=RUB):

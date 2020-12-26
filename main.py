@@ -15,5 +15,5 @@ end_date = datetime(2020, 12, 23)
 #end_date = datetime.now()
 
 #pprint(portfolio.get_value())
-pprint(portfolio.get_state())
+print(portfolio.get_state())
 #portfolio.chart(start_date, end_date, currency=Portfolio.RUB)
