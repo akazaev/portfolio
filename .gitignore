@@ -2,6 +2,6 @@
 .~*
 reports
 __pycache__
-secret.py
+portfolio/secret.py
 examples
 test_*.py

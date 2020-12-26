@@ -2,7 +2,7 @@ from datetime import datetime
 
 import cProfile
 
-from portfolio import Portfolio
+from portfolio.portfolio import Portfolio
 
 portfolio = Portfolio(1)
 

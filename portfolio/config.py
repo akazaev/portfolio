@@ -1,4 +1,4 @@
-from secret import *
+from portfolio.secret import *
 
 API_URL = 'https://api-invest.tinkoff.ru/openapi/sandbox'
 ISS_API_URL = 'https://iss.moex.com'

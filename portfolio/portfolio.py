@@ -1,16 +1,15 @@
 import builtins
-
-from base import date_to_key, key_to_date
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 
-from base import TimeRange, Value, ValueList
-from config import CBR_RATE, CBR_BASE_RATE
-from loaders import QuotesLoader
-from managers import (
+from portfolio.base import (
+    TimeRange, Value, ValueList, date_to_key, key_to_date)
+from portfolio.config import CBR_RATE, CBR_BASE_RATE
+from portfolio.loaders import QuotesLoader
+from portfolio.managers import (
     QuotesManager, OrdersManager, MoneyManager, SecuritiesManager,
     Order, Money, DividendManager, CommissionManager)
 

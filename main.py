@@ -1,8 +1,8 @@
 from pprint import pprint
 from datetime import datetime
 
-from base import date_to_key
-from portfolio import Portfolio
+from portfolio.base import date_to_key
+from portfolio.portfolio import Portfolio
 
 
 #portfolio = Portfolio(1)
@@ -15,5 +15,5 @@ end_date = datetime(2020, 12, 23)
 #end_date = datetime.now()
 
 #pprint(portfolio.get_value())
-print(portfolio.get_state())
-#portfolio.chart(start_date, end_date, currency=Portfolio.RUB)
+#print(portfolio.get_state())
+portfolio.chart(start_date, end_date, currency=Portfolio.RUB)

@@ -1,7 +1,7 @@
 from datetime import datetime
 from pymongo import MongoClient, ASCENDING
 
-from config import MONGO_URL
+from portfolio.config import MONGO_URL
 
 
 _CLIENT = None

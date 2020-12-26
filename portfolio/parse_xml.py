@@ -2,10 +2,10 @@ from datetime import datetime
 
 import xml.etree.ElementTree as etree
 
-from managers import DividendManager, CommissionManager
+from portfolio.managers import DividendManager, CommissionManager
 
 
-tree = etree.parse('reports/report.xml')
+tree = etree.parse('../reports/report.xml')
 root = tree.getroot()
 
 

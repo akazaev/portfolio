@@ -2,3 +2,6 @@ requests
 pymongo
 matplotlib
 tabulate
+flask
+flask-table
+flask-wtf

@@ -2,13 +2,13 @@ from datetime import datetime
 
 import requests
 
-from config import API_URL, API_TOKEN, ISS_API_URL
+from portfolio.config import API_URL, API_TOKEN, ISS_API_URL
 
 
 class QuotesLoader:
     @classmethod
     def history(cls, isin, time_range, interval='day'):
-        from managers import SecuritiesManager
+        from portfolio.managers import SecuritiesManager
         data = SecuritiesManager.get_data(isin=isin)
         figi = data['figi']
         headers = {'Authorization': f'Bearer {API_TOKEN}'}
@@ -50,7 +50,7 @@ class QuotesLoader:
 
     @classmethod
     def _get_broker_data(cls, isin):
-        from managers import SecuritiesManager
+        from portfolio.managers import SecuritiesManager
         data = SecuritiesManager.get_data(isin=isin)
         figi = data['figi']
         headers = {'Authorization': f'Bearer {API_TOKEN}'}

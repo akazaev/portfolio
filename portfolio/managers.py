@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 from collections import OrderedDict, namedtuple
 from functools import lru_cache
 
-from base import DBManager, date_to_key, TimeRange
-from loaders import QuotesLoader
+from portfolio.base import DBManager, date_to_key, TimeRange
+from portfolio.loaders import QuotesLoader
 
 
 class QuotesManager(DBManager):
@@ -47,7 +47,7 @@ class QuotesManager(DBManager):
         return result
 
 
-Money = namedtuple('Money', ['date', 'cur', 'sum'])
+Money = namedtuple('Money', ['date', 'cur', 'sum', 'portfolio', 'broker'])
 
 
 class MoneyManager(DBManager):
@@ -56,18 +56,23 @@ class MoneyManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_data(cls, portfolio_id, time_range, broker_id=None):
-        filters = {'portfolio': portfolio_id, 'date': time_range,
-                   'sort': 'time'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
+        filters = {'sort': 'time'}
         if broker_id:
             filters['broker'] = broker_id
+        if portfolio_id:
+            filters['portfolio'] = portfolio_id
+        if time_range:
+            filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
-                          sum=row['sum']) for row in data]
+                          sum=row['sum'], portfolio=row['portfolio'],
+                          broker=row['broker']) for row in data]
         return data
 
 
-Order = namedtuple('Order', ['date', 'isin', 'quantity', 'sum', 'cur'])
+Order = namedtuple('Order', ['date', 'isin', 'quantity', 'sum', 'cur',
+                             'portfolio', 'broker'])
 
 
 class OrdersManager(DBManager):
@@ -76,15 +81,19 @@ class OrdersManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_data(cls, portfolio_id, time_range, broker_id=None):
-        filters = {'portfolio': portfolio_id, 'date': time_range,
-                   'sort': 'time'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
+        filters = {'sort': 'time'}
         if broker_id:
             filters['broker'] = broker_id
+        if portfolio_id:
+            filters['portfolio'] = portfolio_id
+        if time_range:
+            filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), isin=row['isin'],
                           quantity=row['quantity'], sum=row['sum'],
-                          cur=row['cur']) for row in data]
+                          cur=row['cur'], portfolio=row['portfolio'],
+                          broker=row['broker']) for row in data]
         return data
 
 
@@ -115,11 +124,14 @@ class DividendManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_data(cls, portfolio_id, time_range, broker_id=None):
-        filters = {'portfolio': portfolio_id, 'date': time_range,
-                   'sort': 'time'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
+        filters = {'sort': 'time'}
         if broker_id:
             filters['broker'] = broker_id
+        if portfolio_id:
+            filters['portfolio'] = portfolio_id
+        if time_range:
+            filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
                           sum=row['sum']) for row in data]
@@ -135,11 +147,14 @@ class CommissionManager(DBManager):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_data(cls, portfolio_id, time_range, broker_id=None):
-        filters = {'portfolio': portfolio_id, 'date': time_range,
-                   'sort': 'time'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
+        filters = {'sort': 'time'}
         if broker_id:
             filters['broker'] = broker_id
+        if portfolio_id:
+            filters['portfolio'] = portfolio_id
+        if time_range:
+            filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
                           sum=row['sum']) for row in data]
