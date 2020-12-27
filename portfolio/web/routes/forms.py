@@ -1,10 +1,11 @@
-from flask import Blueprint, templating
+from flask import Blueprint, templating, redirect
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, DateField, IntegerField
+from wtforms import StringField, FloatField, IntegerField
 from wtforms.validators import DataRequired
+from wtforms.fields.html5 import DateField
 
 
-forms = Blueprint('forms', __name__, url_prefix='/')
+forms = Blueprint('forms', __name__, url_prefix='/forms')
 
 
 class OrderForm(FlaskForm):
@@ -17,9 +18,9 @@ class OrderForm(FlaskForm):
     price = FloatField('Price', validators=[DataRequired()])
 
 
-@forms.route('/', methods=('GET', 'POST'))
+@forms.route('/order', methods=('GET', 'POST'))
 def submit():
     form = OrderForm()
-    #if form.validate_on_submit():
-    #    return redirect('/success')
+    if form.validate_on_submit():
+        return redirect('/tables/orders')
     return templating.render_template('form.html', form=form)

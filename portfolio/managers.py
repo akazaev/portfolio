@@ -55,9 +55,8 @@ class MoneyManager(DBManager):
     model = Money
 
     @classmethod
-    @lru_cache(maxsize=None)
     def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'time'}
+        filters = {'sort': 'date'}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:
@@ -80,9 +79,9 @@ class OrdersManager(DBManager):
     model = Order
 
     @classmethod
-    @lru_cache(maxsize=None)
-    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'time'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None,
+                 sort=1):
+        filters = {'sort': ('date', sort)}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:
@@ -123,9 +122,8 @@ class DividendManager(DBManager):
     model = Dividend
 
     @classmethod
-    @lru_cache(maxsize=None)
     def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'time'}
+        filters = {'sort': 'date'}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:
@@ -146,9 +144,8 @@ class CommissionManager(DBManager):
     model = Commission
 
     @classmethod
-    @lru_cache(maxsize=None)
     def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'time'}
+        filters = {'sort': 'date'}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:

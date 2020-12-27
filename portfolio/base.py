@@ -1,5 +1,5 @@
 from datetime import datetime
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, DESCENDING
 
 from portfolio.config import MONGO_URL
 
@@ -174,6 +174,8 @@ class DBManager:
             else:
                 response = db[cls.collection].find(kwargs)
         if sort:
-            response = response.sort([(field, ASCENDING)
-                                      for field in sort])
+            response = response.sort([
+                (field[0], ASCENDING if field[1] >= 0 else DESCENDING)
+                if isinstance(field, tuple) else (field, ASCENDING)
+                for field in sort])
         return response

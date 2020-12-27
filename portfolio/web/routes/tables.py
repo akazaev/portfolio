@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, templating
 from flask_table import Table, Col
 
 from portfolio.managers import MoneyManager, OrdersManager
@@ -16,8 +16,8 @@ class MoneyTable(Table):
 @tables.route('/money')
 def money_table():
     items = MoneyManager.get_data()
-    table = MoneyTable(items)
-    return table.__html__()
+    table = MoneyTable(items, classes=['table', 'table-dark'])
+    return templating.render_template('table.html', table=table)
 
 
 class OrdersTable(Table):
@@ -31,6 +31,6 @@ class OrdersTable(Table):
 
 @tables.route('/orders')
 def orders_table():
-    items = OrdersManager.get_data()
-    table = MoneyTable(items)
-    return table.__html__()
+    items = OrdersManager.get_data(sort=-1)
+    table = OrdersTable(items, classes=['table', 'table-dark'])
+    return templating.render_template('table.html', table=table)
