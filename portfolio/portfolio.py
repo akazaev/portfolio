@@ -345,9 +345,13 @@ class Portfolio:
             position_orig = builtins.round(position_orig, 2)
             state.append([ticker, name, quantity, sec_cur,
                           position_orig, position])
-        state = tabulate(state, headers=["Ticker","Name", "Quantity", "Cur",
-                                         "Sum", "Sum (rub)"])
         return state
+
+    def show_state(self):
+        state = self.get_state()
+        state = tabulate(state, headers=["Ticker", "Name", "Quantity", "Cur",
+                                         "Sum", "Sum (rub)"])
+        print(state)
 
     def get_cbr_history(self, time_range, currency=RUB):
         money_range = TimeRange(None, time_range.end_time)

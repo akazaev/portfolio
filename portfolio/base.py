@@ -116,7 +116,7 @@ class TimeRange:
 
 
 class DBManager:
-    collection = mode = None
+    collection = model = None
 
     @classmethod
     def upsert(cls, key, data=None):
@@ -136,8 +136,15 @@ class DBManager:
         client = get_client()
         db = client.market
         if isinstance(data, dict):
+            for key in data:
+                if not hasattr(cls.model, key):
+                    raise ValueError(f'unknown field {key}')
             db[cls.collection].insert(data)
         if isinstance(data, list):
+            for key in data[0]:
+                if not hasattr(cls.model, key):
+                    raise ValueError(f'unknown field {key}')
+            db[cls.collection].insert(data)
             db[cls.collection].insert_many(data)
 
     @classmethod

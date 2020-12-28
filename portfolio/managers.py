@@ -70,8 +70,8 @@ class MoneyManager(DBManager):
         return data
 
 
-Order = namedtuple('Order', ['date', 'isin', 'quantity', 'sum', 'cur',
-                             'portfolio', 'broker'])
+Order = namedtuple('Order', ['date', 'isin', 'quantity', 'price', 'sum', 'cur',
+                             'portfolio', 'broker', 'market'])
 
 
 class OrdersManager(DBManager):
@@ -92,7 +92,8 @@ class OrdersManager(DBManager):
         data = [cls.model(date=date_to_key(row['date']), isin=row['isin'],
                           quantity=row['quantity'], sum=row['sum'],
                           cur=row['cur'], portfolio=row['portfolio'],
-                          broker=row['broker']) for row in data]
+                          broker=row['broker'], price=row['price'],
+                          market=row['market']) for row in data]
         return data
 
 
