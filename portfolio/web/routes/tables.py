@@ -1,31 +1,31 @@
 from flask import Blueprint, templating
 from flask_table import Table, Col
 
-from portfolio.managers import MoneyManager, OrdersManager
+from portfolio.managers import MoneyManager, OrdersManager, DividendManager
 from portfolio.portfolio import Portfolio
 
 tables = Blueprint('tables', __name__, url_prefix='/tables')
 
 
-class MoneyTable(Table):
+class BaseTable(Table):
     date = Col('Date')
     sum = Col('Sum')
     cur = Col('Cur')
     broker = Col('Broker')
+
+
+class MoneyTable(BaseTable):
+    pass
 
 
 @tables.route('/money')
 def money_table():
-    items = MoneyManager.get_data()
+    items = MoneyManager.get_data(sort=-1)
     table = MoneyTable(items, classes=['table', 'table-dark'])
     return templating.render_template('table.html', table=table)
 
 
-class OrdersTable(Table):
-    date = Col('Date')
-    sum = Col('Sum')
-    cur = Col('Cur')
-    broker = Col('Broker')
+class OrdersTable(BaseTable):
     isin = Col('ISIN')
     quantity = Col('quantity')
 
@@ -62,4 +62,15 @@ def portfolio_table():
             'position': position
         })
     table = PortfolioTable(items, classes=['table', 'table-dark'])
+    return templating.render_template('table.html', table=table)
+
+
+class DividendsTable(BaseTable):
+    pass
+
+
+@tables.route('/dividends')
+def dividends_table():
+    items = DividendManager.get_data(sort=-1)
+    table = DividendsTable(items, classes=['table', 'table-dark'])
     return templating.render_template('table.html', table=table)

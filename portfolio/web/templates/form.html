@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <form action="/forms/order" method="post">
+<div class="container-fluid">
+    <div class="col-sm-1">
+    <form action="{{ url_for(request.endpoint) }}" method="post">
         {{ form.hidden_tag() }}
         {% for field in form if field.name != 'csrf_token' %}
             <div class="form-group">
                 {{ field.label() }}
-                {{ field(class_="date") }}
+                {{ field(class_="form-control") }}
                 {% for error in field.errors %}
                     <div class="error">{{ error }}</div>
                 {% endfor %}
@@ -14,4 +16,6 @@
         {% endfor %}
         <input type="submit" value="Add" class="btn btn-primary">
     </form>
+    </div>
+</div>
 {% endblock %}

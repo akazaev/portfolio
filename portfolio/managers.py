@@ -47,7 +47,8 @@ class QuotesManager(DBManager):
         return result
 
 
-Money = namedtuple('Money', ['date', 'cur', 'sum', 'portfolio', 'broker'])
+Money = namedtuple('Money', ['date', 'cur', 'sum', 'portfolio', 'broker',
+                             'comment'])
 
 
 class MoneyManager(DBManager):
@@ -55,8 +56,9 @@ class MoneyManager(DBManager):
     model = Money
 
     @classmethod
-    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'date'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None,
+                 sort=1):
+        filters = {'sort': ('date', sort)}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:
@@ -66,7 +68,8 @@ class MoneyManager(DBManager):
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
                           sum=row['sum'], portfolio=row['portfolio'],
-                          broker=row['broker']) for row in data]
+                          broker=row['broker'], comment=row['comment'])
+                for row in data]
         return data
 
 
@@ -115,7 +118,8 @@ class SecuritiesManager(DBManager):
         return data
 
 
-Dividend = namedtuple('Dividend', ['date', 'cur', 'sum'])
+Dividend = namedtuple('Dividend', ['date', 'cur', 'sum', 'portfolio', 'broker',
+                                   'comment'])
 
 
 class DividendManager(DBManager):
@@ -123,8 +127,9 @@ class DividendManager(DBManager):
     model = Dividend
 
     @classmethod
-    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None):
-        filters = {'sort': 'date'}
+    def get_data(cls, portfolio_id=None, time_range=None, broker_id=None,
+                 sort=1):
+        filters = {'sort': ('date', sort)}
         if broker_id:
             filters['broker'] = broker_id
         if portfolio_id:
@@ -133,7 +138,9 @@ class DividendManager(DBManager):
             filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
-                          sum=row['sum']) for row in data]
+                          sum=row['sum'], portfolio=row['portfolio'],
+                          broker=row['broker'], comment=row['comment'])
+                for row in data]
         return data
 
 

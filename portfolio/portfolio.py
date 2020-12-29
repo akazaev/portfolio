@@ -19,6 +19,9 @@ class Portfolio:
     USD = 'USD'
     EUR = 'EUR'
     CURRENCIES = (RUB, USD, EUR, )
+    MB = 'MB'
+    SPB = 'SPB'
+    MARKETS = (MB, SPB, )
 
     def __init__(self, portfolio_id, broker_id=None):
         self.portfolio_id = portfolio_id
