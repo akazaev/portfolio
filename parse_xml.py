@@ -5,7 +5,7 @@ import xml.etree.ElementTree as etree
 from portfolio.managers import DividendManager, CommissionManager
 
 
-tree = etree.parse('../reports/report.xml')
+tree = etree.parse('reports/report.xml')
 root = tree.getroot()
 
 

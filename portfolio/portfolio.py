@@ -278,7 +278,7 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManager.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = stock_orders + money_orders
+        all_orders = money_orders + stock_orders
         all_orders.sort(key=lambda x: x[0])
 
         portfolio = defaultdict(int)
@@ -301,7 +301,19 @@ class Portfolio:
                         raise ValueError()
                 else:
                     portfolio[(isin, cur)] += quantity
-                portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
+
+                if quantity > 0 and not portfolio[(cur, cur)]:
+                    s = sum
+                    for tcur in self.CURRENCIES:
+                        if not portfolio[(cur, tcur)]:
+                            continue
+                        sub = min(portfolio[(cur, tcur)], s)
+                        portfolio[(cur, tcur)] -= sub
+                        s -= sub
+                    if s > 0:
+                        raise ValueError()
+                else:
+                    portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
             if isinstance(order, Money):
                 portfolio[(cur, cur)] += sum
 
@@ -417,9 +429,13 @@ class Portfolio:
             date += timedelta(days=1)
 
     def _get_history(self, manager, time_range, currency):
+        cash = ValueList(manager.collection)
         money_range = TimeRange(None, time_range.end_time)
         money_orders = manager.get_data(self.portfolio_id, money_range,
                                         broker_id=self.broker_id)
+        if not money_orders:
+            return cash
+
         cur_range = TimeRange(key_to_date(money_orders[0].date),
                               time_range.end_time)
         usd = QuotesManager.get_quotes(self.USD, cur_range)
@@ -437,7 +453,6 @@ class Portfolio:
             operations[order.date].append(order)
 
         prev_price = {}
-        cash = ValueList(manager.collection)
         s = 0
         for date in dates:
             if date in usd:

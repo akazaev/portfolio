@@ -6,8 +6,12 @@ from portfolio.base import DBManager, date_to_key, TimeRange
 from portfolio.loaders import QuotesLoader
 
 
+Quote = namedtuple('Quote', ['time', 'price', 'isin', 'figi', 'interval'])
+
+
 class QuotesManager(DBManager):
     collection = 'quotes'
+    model = Quote
 
     @classmethod
     @lru_cache(maxsize=None)

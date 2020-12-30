@@ -28,6 +28,12 @@ class Value:
     def __float__(self):
         return self.value
 
+    def copy(self):
+        value = Value()
+        value.key = self.key
+        value.value = self.value
+        return value
+
 
 class ValueList(list):
     def __init__(self, title):
@@ -55,6 +61,10 @@ class ValueList(list):
     def __add__(self, other):
         assert isinstance(other, ValueList)
         result = ValueList(f'{self.title}+{other.title}')
+        if not other:
+            for item in self:
+                result.append(item.copy())
+
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
                 raise ValueError('inconsistent lists')
@@ -67,6 +77,10 @@ class ValueList(list):
     def __sub__(self, other):
         assert isinstance(other, ValueList)
         result = ValueList(f'{self.title}-{other.title}')
+        if not other:
+            for item in self:
+                result.append(item.copy())
+
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
                 raise ValueError('inconsistent lists')
@@ -79,6 +93,10 @@ class ValueList(list):
     def __truediv__(self, other):
         assert isinstance(other, ValueList)
         result = ValueList(f'{self.title}/{other.title}')
+        if not other:
+            for item in self:
+                result.append(item.copy())
+
         for item1, item2 in zip(self, other):
             if item1.key != item2.key:
                 raise ValueError('inconsistent lists')
@@ -144,7 +162,6 @@ class DBManager:
             for key in data[0]:
                 if not hasattr(cls.model, key):
                     raise ValueError(f'unknown field {key}')
-            db[cls.collection].insert(data)
             db[cls.collection].insert_many(data)
 
     @classmethod
