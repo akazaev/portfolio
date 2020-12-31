@@ -52,6 +52,7 @@ class Portfolio:
         self.add_charts(data - cash_data, cbr_data - cash_data,
                         dividend_data, commission_data)
         self.add_charts(100 * (data - cash_data) / cash_data,
+                        100 * (data + dividend_data - cash_data) / cash_data,
                         100 * (cbr_data - cash_data) / cash_data, step=10)
         self.show_charts()
 
@@ -317,7 +318,9 @@ class Portfolio:
             if isinstance(order, Money):
                 portfolio[(cur, cur)] += sum
 
-        state = []
+        state_asset = []
+        asset_sum = 0
+        state_cur = []
         for key, quantity in portfolio.items():
             if not quantity:
                 continue
@@ -358,14 +361,23 @@ class Portfolio:
 
             position = builtins.round(position, 2)
             position_orig = builtins.round(position_orig, 2)
-            state.append([ticker, name, quantity, sec_cur,
-                          position_orig, position])
-        return state
+            if ticker == sec_cur:
+                state_cur.append([ticker, name, quantity, sec_cur,
+                                  position_orig, position])
+            else:
+                state_asset.append([ticker, name, quantity, sec_cur,
+                                    position_orig, position])
+                asset_sum += position
+        state_asset.append(['All', '', '', '', '', asset_sum])
+        return state_asset, state_cur
 
     def show_state(self):
-        state = self.get_state()
-        state = tabulate(state, headers=["Ticker", "Name", "Quantity", "Cur",
-                                         "Sum", "Sum (rub)"])
+        state_asset, state_cur = self.get_state()
+        state = tabulate(state_cur, headers=["Ticker", "Name", "Quantity",
+                                             "Cur", "Sum", "Sum (rub)"])
+        print(state)
+        state = tabulate(state_asset, headers=["Ticker", "Name", "Quantity",
+                                               "Cur", "Sum", "Sum (rub)"])
         print(state)
 
     def get_cbr_history(self, time_range, currency=RUB):
