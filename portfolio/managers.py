@@ -77,6 +77,13 @@ class MoneyManager(DBManager):
         return data
 
 
+class MoneyManagerCached(MoneyManager):
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_data(cls, *args, **kwargs):
+        return super().get_data(*args, **kwargs)
+
+
 Order = namedtuple('Order', ['date', 'isin', 'quantity', 'price', 'sum', 'cur',
                              'portfolio', 'broker', 'market'])
 
