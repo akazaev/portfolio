@@ -72,7 +72,7 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManagerCached.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = stock_orders + money_orders
+        all_orders = money_orders + stock_orders
         all_orders.sort(key=lambda x: x[0])
 
         cur_range = TimeRange(key_to_date(all_orders[0].date),
@@ -92,20 +92,7 @@ class Portfolio:
         portfolio = defaultdict(int)
         for date in dates:
             day_orders = operations[date]
-
-            for order in day_orders:
-                cur = order.cur
-                sum = order.sum
-                if isinstance(order, Order):
-                    isin = order.isin
-                    quantity = order.quantity
-                    if isin in changes and changes[isin] in portfolio:
-                        portfolio[(isin, cur)] = portfolio.pop(
-                            (changes[isin], cur))
-                    portfolio[(isin, cur)] += quantity
-                    portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
-                if isinstance(order, Money):
-                    portfolio[(cur, cur)] += sum
+            self._update_portfolio_dict(portfolio, day_orders)
 
             if date < time_range.start:
                 continue
@@ -163,6 +150,41 @@ class Portfolio:
             value.append(day_value)
         return value
 
+    def _update_portfolio_dict(self, portfolio, orders):
+        for order in orders:
+            cur = order.cur
+            sum = order.sum
+            if isinstance(order, Order):
+                isin = order.isin
+                quantity = order.quantity
+                if quantity < 0 and not portfolio[(isin, cur)]:
+                    q = abs(quantity)
+                    for tcur in self.CURRENCIES:
+                        if not portfolio[(isin, tcur)]:
+                            continue
+                        sub = min(portfolio[(isin, tcur)], q)
+                        portfolio[(isin, tcur)] -= sub
+                        q -= sub
+                    if q:
+                        raise ValueError()
+                else:
+                    portfolio[(isin, cur)] += quantity
+
+                if quantity > 0 and not portfolio[(cur, cur)]:
+                    s = sum
+                    for tcur in self.CURRENCIES:
+                        if not portfolio[(cur, tcur)]:
+                            continue
+                        sub = min(portfolio[(cur, tcur)], s)
+                        portfolio[(cur, tcur)] -= sub
+                        s -= sub
+                    if s > 0:
+                        raise ValueError()
+                else:
+                    portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
+            if isinstance(order, Money):
+                portfolio[(cur, cur)] += sum
+
     def get_value(self):
         changes = {
             'JE00B5BCW814': 'RU000A1025V3',
@@ -184,32 +206,11 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManagerCached.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = stock_orders + money_orders
+        all_orders = money_orders + stock_orders
         all_orders.sort(key=lambda x: x[0])
 
         portfolio = defaultdict(int)
-
-        for order in all_orders:
-            cur = order.cur
-            sum = order.sum
-            if isinstance(order, Order):
-                isin = order.isin
-                quantity = order.quantity
-                if quantity < 0 and not portfolio[(isin, cur)]:
-                    q = abs(quantity)
-                    for tcur in self.CURRENCIES:
-                        if not portfolio[(isin, tcur)]:
-                            continue
-                        sub = min(portfolio[(isin, tcur)], q)
-                        portfolio[(isin, tcur)] -= sub
-                        q -= sub
-                    if q:
-                        raise ValueError()
-                else:
-                    portfolio[(isin, cur)] += quantity
-                portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
-            if isinstance(order, Money):
-                portfolio[(cur, cur)] += sum
+        self._update_portfolio_dict(portfolio, all_orders)
 
         portfolio_sum = 0
         active_sum = 0
@@ -280,40 +281,7 @@ class Portfolio:
         all_orders.sort(key=lambda x: x[0])
 
         portfolio = defaultdict(int)
-
-        for order in all_orders:
-            cur = order.cur
-            sum = order.sum
-            if isinstance(order, Order):
-                isin = order.isin
-                quantity = order.quantity
-                if quantity < 0 and not portfolio[(isin, cur)]:
-                    q = abs(quantity)
-                    for tcur in self.CURRENCIES:
-                        if not portfolio[(isin, tcur)]:
-                            continue
-                        sub = min(portfolio[(isin, tcur)], q)
-                        portfolio[(isin, tcur)] -= sub
-                        q -= sub
-                    if q:
-                        raise ValueError()
-                else:
-                    portfolio[(isin, cur)] += quantity
-
-                if quantity > 0 and not portfolio[(cur, cur)]:
-                    s = sum
-                    for tcur in self.CURRENCIES:
-                        if not portfolio[(cur, tcur)]:
-                            continue
-                        sub = min(portfolio[(cur, tcur)], s)
-                        portfolio[(cur, tcur)] -= sub
-                        s -= sub
-                    if s > 0:
-                        raise ValueError()
-                else:
-                    portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
-            if isinstance(order, Money):
-                portfolio[(cur, cur)] += sum
+        self._update_portfolio_dict(portfolio, all_orders)
 
         state_asset = []
         asset_sum = 0
