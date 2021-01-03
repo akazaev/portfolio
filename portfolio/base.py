@@ -127,6 +127,12 @@ class ValueList(list):
 
 class TimeRange:
     def __init__(self, start_time, end_time):
+        if start_time:
+            assert isinstance(start_time, datetime)
+            start_time = start_time.replace(hour=0, minute=0, second=0)
+        if end_time:
+            assert isinstance(end_time, datetime)
+            end_time = end_time.replace(hour=23, minute=59, second=59)
         self.start_time = start_time
         self.end_time = end_time
         self.start = date_to_key(start_time) if start_time else None

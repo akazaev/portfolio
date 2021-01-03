@@ -23,15 +23,17 @@ class Portfolio:
     SPB = 'SPB'
     MARKETS = (MB, SPB, )
 
+    FXIT = 'IE00BD3QJ757'
+    FXUS = 'IE00BD3QHZ91'
+    FXRL = 'IE00BQ1Y6480'
+    FXRB = 'IE00B7L7CP77'
+    FUNDS = (FXIT, FXUS, FXRL, FXRB, )
+
     def __init__(self, portfolio_id, broker_id=None):
         self.portfolio_id = portfolio_id
         self.broker_id = broker_id
 
     def chart(self, start_date, end_date, currency=RUB):
-        assert isinstance(start_date, datetime)
-        assert isinstance(end_date, datetime)
-        start_date = start_date.replace(hour=0, minute=0, second=0)
-        end_date = end_date.replace(hour=23, minute=59, second=59)
         time_range = TimeRange(start_date, end_date)
 
         data = self.get_value_history(time_range, currency=currency)
@@ -41,18 +43,19 @@ class Portfolio:
                                                   currency=currency)
         commission_data = self.get_commission_history(time_range,
                                                       currency=currency)
-        assert len(data) == len(cbr_data)
-        assert len(data) == len(cash_data)
-        assert len(data) == len(dividend_data)
-        assert len(data) == len(commission_data)
+
+        funds_data = [self.get_fund_history(cash_data, fund, currency=currency)
+                      for fund in self.FUNDS]
 
         self.add_charts(dividend_data + data, cbr_data, cash_data, data,
                         step=50000)
+        self.add_charts(dividend_data + data, *funds_data, step=50000)
         self.add_charts(data - cash_data, cbr_data - cash_data,
                         dividend_data, commission_data)
         self.add_charts(100 * (data - cash_data) / cash_data,
                         100 * (data + dividend_data - cash_data) / cash_data,
                         100 * (cbr_data - cash_data) / cash_data, step=10)
+
         self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
@@ -192,8 +195,8 @@ class Portfolio:
         }
 
         usd_based = (
-            'IE00BD3QJ757',  # FXIT
-            'IE00BD3QHZ91',  # FXUS
+            self.FXIT,  # FXIT
+            self.FXUS,  # FXUS
         )
 
         usd = QuotesLoader.current(self.USD)
@@ -482,6 +485,29 @@ class Portfolio:
     def get_commission_history(self, time_range, currency=RUB):
         return self._get_history(CommissionManager, time_range, currency)
 
+    def get_fund_history(self, cash_data, fund, currency=RUB):
+        cur_range = TimeRange(key_to_date(cash_data[0].key),
+                              key_to_date(cash_data[-1].key))
+        quotes = QuotesManager.get_quotes(fund, cur_range)
+        prev_price = prev_value = c = 0
+        history = ValueList(fund)
+
+        for cash_day in cash_data:
+            if cash_day.key in quotes:
+                prev_price = price = quotes[cash_day.key]
+            else:
+                price = prev_price
+
+            if abs(cash_day.value - prev_value) > 0:
+                c += (cash_day.value - prev_value)/price
+            prev_value = cash_day.value
+
+            day_value = Value()
+            day_value.key = cash_day.key
+            day_value.value = price * c
+            history.append(day_value)
+        return history
+
     def add_charts(self, *args, step=10000):
         assert args
         figure = plt.figure()
@@ -496,6 +522,7 @@ class Portfolio:
         legend = []
         plots = []
         for data in args:
+            assert len(data) == len(args[0])
             plot = ax.plot(t, data)[0]
             plots.append(plot)
             value = str(round(data[-1].value, 2))
