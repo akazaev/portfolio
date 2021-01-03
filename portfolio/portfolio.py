@@ -49,7 +49,11 @@ class Portfolio:
 
         self.add_charts(dividend_data + data, cbr_data, cash_data, data,
                         step=50000)
-        self.add_charts(dividend_data + data, *funds_data, step=50000)
+        self.add_charts(dividend_data + data, cbr_data, *funds_data,
+                        step=50000)
+        self.add_charts(dividend_data + data - cash_data, cbr_data - cash_data,
+                        *[data - cash_data for data in funds_data],
+                        step=50000)
         self.add_charts(data - cash_data, cbr_data - cash_data,
                         dividend_data, commission_data)
         self.add_charts(100 * (data - cash_data) / cash_data,
