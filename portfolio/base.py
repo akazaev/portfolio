@@ -22,6 +22,10 @@ def key_to_date(date):
     return datetime(date[0], date[1], date[2])
 
 
+def sround(s):
+    return round(s, 2)
+
+
 class Value:
     __slots__ = ('key', 'value')
 
@@ -102,7 +106,7 @@ class ValueList(list):
                 raise ValueError('inconsistent lists')
             value = Value()
             value.key = item1.key
-            value.value = round(item1.value / item2.value, 3)
+            value.value = sround(item1.value / item2.value)
             result.append(value)
         return result
 

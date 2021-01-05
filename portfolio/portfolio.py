@@ -6,7 +6,7 @@ from tabulate import tabulate
 import matplotlib.pyplot as plt
 
 from portfolio.base import (
-    TimeRange, Value, ValueList, date_to_key, key_to_date)
+    TimeRange, Value, ValueList, date_to_key, key_to_date, sround)
 from portfolio.config import CBR_RATE, CBR_BASE_RATE
 from portfolio.loaders import QuotesLoader
 from portfolio.managers import (
@@ -27,6 +27,7 @@ class Portfolio:
     FXUS = 'IE00BD3QHZ91'
     FXRL = 'IE00BQ1Y6480'
     FXRB = 'IE00B7L7CP77'
+    FXMM = 'IE00BL3DYX33'
     FUNDS = (FXIT, FXUS, FXRL, FXRB, )
 
     def __init__(self, portfolio_id, broker_id=None):
@@ -203,6 +204,8 @@ class Portfolio:
             self.FXUS,  # FXUS
         )
 
+        bonds_based = (self.FXMM, self.FXRB, )
+
         usd = QuotesLoader.current(self.USD)
         eur = QuotesLoader.current(self.EUR)
 
@@ -221,10 +224,12 @@ class Portfolio:
 
         portfolio_sum = 0
         active_sum = 0
+        bonds_sum = 0
         for key, quantity in portfolio.items():
             if not quantity:
                 continue
             isin, cur = key
+            bonds = False
 
             if isin == self.RUB:
                 position = quantity
@@ -241,6 +246,7 @@ class Portfolio:
 
                 security = SecuritiesManager.get_data(isin=isin)
                 cur = security['currency']
+                bonds = security['type'] == 'Bond'
 
                 if cur == self.RUB:
                     c2 = 1
@@ -253,8 +259,11 @@ class Portfolio:
 
                 position = c1 * c2 * quantity
             portfolio_sum += position
-            if key[0] != key[1]:
+            if key[0] not in self.CURRENCIES:
                 active_sum += position
+
+            if isin in bonds_based or bonds:
+                bonds_sum += position
 
             if isin in usd_based:
                 cur = self.USD
@@ -263,12 +272,32 @@ class Portfolio:
         for key in by_cur:
             by_cur[key] = by_cur[key] / portfolio_sum * 100
 
-        cash = {}
+        cash = defaultdict(int)
         for key in portfolio:
-            if key[0] == key[1]:
-                cash[key[0]] = portfolio[key]
+            if key[0] in self.CURRENCIES:
+                cash[key[0]] += portfolio[key]
 
-        return portfolio_sum, active_sum, by_cur, cash
+        return (portfolio_sum, active_sum, bonds_sum, cash), by_cur
+
+    def show_value(self):
+        sum, by_cur = self.get_value()
+        portfolio_sum, active_sum, bonds_sum, cash = sum
+        data = [
+            ["All", sround(portfolio_sum)],
+            ["Asset", sround(active_sum)],
+            ["Bonds", sround(bonds_sum)],
+            ["Free cash", ""],
+            *([cur, sround(cur_sum)] for cur, cur_sum in cash.items()),
+        ]
+        state = tabulate(data, headers=["Sum name", "Value"])
+        print(state)
+        data = [
+            ["Bonds", sround(100 * bonds_sum / active_sum)],
+            ["All by currency", ""],
+            *([cur, sround(cur_sum)] for cur, cur_sum in by_cur.items()),
+        ]
+        state = tabulate(data, headers=["Ration name", "Value"])
+        print(state)
 
     def get_state(self):
         changes = {
@@ -331,8 +360,8 @@ class Portfolio:
                 position = c1 * c2 * quantity
                 position_orig = c1 * quantity
 
-            position = builtins.round(position, 2)
-            position_orig = builtins.round(position_orig, 2)
+            position = sround(position)
+            position_orig = sround(position_orig)
             if ticker == sec_cur:
                 state_cur.append([ticker, name, quantity, sec_cur,
                                   position_orig, position])
@@ -529,7 +558,7 @@ class Portfolio:
             assert len(data) == len(args[0])
             plot = ax.plot(t, data)[0]
             plots.append(plot)
-            value = str(round(data[-1].value, 2))
+            value = str(sround(data[-1].value))
             ax.text(t[-1], data[-1].value, value)
             legend.append(data.title)
             minv = data.min if minv is None else min(minv, data.min)
