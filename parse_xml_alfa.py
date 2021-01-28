@@ -1,11 +1,13 @@
+import math
 from datetime import datetime
 
 import xml.etree.ElementTree as etree
 
-from portfolio.managers import DividendManager, CommissionManager
+from portfolio.managers import (
+    DividendManager, CommissionManager, MoneyManager)
 
 
-tree = etree.parse('reports/report.xml')
+tree = etree.parse('Брокерский+162363+(01.11.19-27.01.21).xml')
 root = tree.getroot()
 
 
@@ -37,20 +39,22 @@ def parse_record(record):
         if volume:
             cur_code = get(cur, 'p_code').attrib['p_code']
             time = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
-            return time, abs(float(volume)), cur_code
+            return time, float(volume), cur_code
     raise ValueError('unable to parse')
 
 
 types = set()
 collection = get(root, 'Trades2', 'Report', 'Tablix1',
                  'settlement_date_Collection')
+
 for day in collection:
     for record in get(day, 'rn_Collection'):
         oper_type = get(record, 'oper_type').attrib['oper_type'].strip()
         comment = get(record, 'oper_type', 'comment').attrib['comment'].lower()
+
         if oper_type == 'Перевод':
-            if any(word in comment
-                   for word in ('купон', 'dividend', 'дивиденд')):
+            if any(word in comment for word in (
+                    'купон', 'dividend', 'дивиденд')):
                 time, volume, cur_code = parse_record(record)
                 data = {
                         'portfolio': 1,
@@ -60,19 +64,39 @@ for day in collection:
                         'cur': cur_code,
                         'date': time
                 }
-                DividendManager.upsert(data)
+                result = DividendManager.upsert(data)
+                if 'upserted' in result:
+                    print(data)
+            elif any(word in comment for word in (
+                    'списание по поручению клиента', 'между рынками',
+                    'из ао "альфа-банк"')):
+                time, volume, cur_code = parse_record(record)
+                data = {
+                    'portfolio': 1,
+                    'sum': volume,
+                    'broker': 1,
+                    'comment': comment,
+                    'cur': cur_code,
+                    'date': time
+                }
+                result = MoneyManager.upsert(data)
+                if 'upserted' in result:
+                    print(data)
+            else:
+                raise ValueError(comment)
         elif oper_type == 'Комиссия':
             time, volume, cur_code = parse_record(record)
-            print(volume, cur_code, comment)
             data = {
                 'portfolio': 1,
-                'sum': volume,
+                'sum': abs(volume),
                 'broker': 1,
                 'comment': comment,
                 'cur': cur_code,
                 'date': time
             }
-            CommissionManager.upsert(data)
+            result = CommissionManager.upsert(data)
+            if 'upserted' in result:
+                print(data)
         else:
             types.add(oper_type)
 

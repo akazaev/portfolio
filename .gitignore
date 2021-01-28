@@ -6,3 +6,4 @@ portfolio/secret.py
 examples
 test_*.py
 main_debug.py
+*.xml

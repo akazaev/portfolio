@@ -85,7 +85,7 @@ class MoneyManagerCached(MoneyManager):
 
 
 Order = namedtuple('Order', ['date', 'isin', 'quantity', 'price', 'sum', 'cur',
-                             'portfolio', 'broker', 'market'])
+                             'portfolio', 'broker', 'market', 'comment'])
 
 
 class OrdersManager(DBManager):
@@ -107,7 +107,7 @@ class OrdersManager(DBManager):
                           quantity=row['quantity'], sum=row['sum'],
                           cur=row['cur'], portfolio=row['portfolio'],
                           broker=row['broker'], price=row['price'],
-                          market=row['market']) for row in data]
+                          market=row['market'], comment='') for row in data]
         return data
 
 

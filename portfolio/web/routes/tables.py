@@ -12,6 +12,7 @@ class BaseTable(Table):
     sum = Col('Sum')
     cur = Col('Cur')
     broker = Col('Broker')
+    comment = Col('Comment')
 
 
 class MoneyTable(BaseTable):
@@ -49,9 +50,9 @@ class PortfolioTable(Table):
 @tables.route('/portfolio')
 def portfolio_table():
     portfolio = Portfolio(portfolio_id=1)
-    data = portfolio.get_state()
+    state_asset, state_cur = portfolio.get_state()
     items = []
-    for item in data:
+    for item in state_asset:
         ticker, name, quantity, sec_cur, position_orig, position = item
         items.append({
             'ticker': ticker,

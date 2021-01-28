@@ -156,8 +156,7 @@ class DBManager:
         db = client.market
         response = db[cls.collection].update(key, {'$set': data},
                                              upsert=True)
-        if response.get('nModified'):
-            print(data)
+        return response
 
     @classmethod
     def insert(cls, data=None):
