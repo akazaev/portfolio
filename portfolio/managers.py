@@ -155,7 +155,8 @@ class DividendManager(DBManager):
         return data
 
 
-Commission = namedtuple('Commission', ['date', 'cur', 'sum'])
+Commission = namedtuple('Commission', ['date', 'cur', 'sum', 'comment',
+                                       'portfolio', 'broker'])
 
 
 class CommissionManager(DBManager):
@@ -173,5 +174,7 @@ class CommissionManager(DBManager):
             filters['date'] = time_range
         data = cls.get(**filters)
         data = [cls.model(date=date_to_key(row['date']), cur=row['cur'],
-                          sum=row['sum']) for row in data]
+                          sum=row['sum'], portfolio=row['portfolio'],
+                          broker=row['broker'], comment=row['comment'])
+                for row in data]
         return data

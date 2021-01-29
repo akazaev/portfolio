@@ -23,6 +23,9 @@ class Portfolio:
     SPB = 'SPB'
     MARKETS = (MB, SPB, )
 
+    ALFA = 'alfa'
+    VTB = 'vtb'
+
     FXIT = 'IE00BD3QJ757'
     FXUS = 'IE00BD3QHZ91'
     FXRL = 'IE00BQ1Y6480'

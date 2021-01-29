@@ -1,7 +1,7 @@
 import datetime
 
-from flask import Blueprint, templating, redirect
-from flask_wtf import FlaskForm
+from flask import Blueprint, templating, redirect, request
+from flask_wtf import FlaskForm, file
 from wtforms import StringField, FloatField, IntegerField, SelectField
 from wtforms.validators import DataRequired
 from wtforms.fields.html5 import DateField
@@ -9,6 +9,8 @@ from wtforms.fields.html5 import DateField
 
 from portfolio.portfolio import Portfolio
 from portfolio.managers import OrdersManager, MoneyManager, DividendManager
+from portfolio.parsers import parse
+from portfolio.web.routes.tables import MoneyTable
 
 
 forms = Blueprint('forms', __name__, url_prefix='/forms')
@@ -87,4 +89,26 @@ def dividend_submit():
         data.pop('csrf_token', None)
         DividendManager.insert(data)
         return redirect('/tables/dividends')
+    return templating.render_template('form.html', form=form)
+
+
+class ReportForm(FlaskForm):
+    broker = SelectField('Market', validators=[DataRequired()],
+                         choices=(
+                             (Portfolio.ALFA, Portfolio.ALFA),
+                             (Portfolio.VTB, Portfolio.VTB),
+                         ))
+    report = file.FileField(validators=[file.FileRequired()])
+
+
+@forms.route('/report', methods=('GET', 'POST'))
+def load_report():
+    form = ReportForm()
+    if form.validate_on_submit():
+        content = request.files['report'].read()
+        broker = form.data['broker']
+        items = parse(content, broker)
+
+        table = MoneyTable(items, classes=['table', 'table-dark'])
+        return templating.render_template('table.html', table=table)
     return templating.render_template('form.html', form=form)
