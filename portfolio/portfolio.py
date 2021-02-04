@@ -33,6 +33,11 @@ class Portfolio:
     FXMM = 'IE00BL3DYX33'
     FUNDS = (FXIT, FXUS, FXRL, FXRB, )
 
+    CHANGES = {
+        'JE00B5BCW814': 'RU000A1025V3',
+        'je00b5bcw814': 'ru000a1025v3',
+    }
+
     def __init__(self, portfolio_id, broker_id=None):
         self.portfolio_id = portfolio_id
         self.broker_id = broker_id
@@ -48,7 +53,10 @@ class Portfolio:
         commission_data = self.get_commission_history(time_range,
                                                       currency=currency)
 
-        funds_data = [self.get_fund_history(cash_data, fund, currency=currency)
+        funds_cash_data = self._get_history(
+            MoneyManagerCached, TimeRange(None, time_range.end_time), currency)
+        funds_data = [self.get_fund_history(funds_cash_data, fund, time_range,
+                                            currency=currency)
                       for fund in self.FUNDS]
 
         self.add_charts(dividend_data + data, cbr_data, cash_data, data,
@@ -67,10 +75,6 @@ class Portfolio:
         self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
-        changes = {
-            'JE00B5BCW814': 'RU000A1025V3',
-            'je00b5bcw814': 'ru000a1025v3',
-        }
         usd = QuotesManager.get_quotes(self.USD, time_range)
         eur = QuotesManager.get_quotes(self.EUR, time_range)
 
@@ -125,8 +129,8 @@ class Portfolio:
                     c = eur.get(date, prev_price[self.EUR])
                     portfolio_sum += c * quantity
                 else:
-                    if isin in changes:
-                        isin = changes[isin]
+                    if isin in self.CHANGES:
+                        isin = self.CHANGES[isin]
                     candles = QuotesManager.get_quotes(isin, time_range)
                     if date in candles:
                         c1 = candles[date]
@@ -197,11 +201,6 @@ class Portfolio:
                 portfolio[(cur, cur)] += sum
 
     def get_value(self):
-        changes = {
-            'JE00B5BCW814': 'RU000A1025V3',
-            'je00b5bcw814': 'ru000a1025v3',
-        }
-
         usd_based = (
             self.FXIT,  # FXIT
             self.FXUS,  # FXUS
@@ -243,8 +242,8 @@ class Portfolio:
                 c = eur
                 position = c * quantity
             else:
-                if isin in changes:
-                    isin = changes[isin]
+                if isin in self.changes:
+                    isin = self.changes[isin]
                 c1 = QuotesLoader.current(isin)
 
                 security = SecuritiesManager.get_data(isin=isin)
@@ -303,11 +302,6 @@ class Portfolio:
         print(state)
 
     def get_state(self):
-        changes = {
-            'JE00B5BCW814': 'RU000A1025V3',
-            'je00b5bcw814': 'ru000a1025v3',
-        }
-
         usd = QuotesLoader.current(self.USD)
         eur = QuotesLoader.current(self.EUR)
 
@@ -342,8 +336,8 @@ class Portfolio:
                 c = eur
                 position = c * quantity
             else:
-                if isin in changes:
-                    isin = changes[isin]
+                if isin in self.changes:
+                    isin = self.changes[isin]
                 c1 = QuotesLoader.current(isin)
 
                 security = SecuritiesManager.get_data(isin=isin)
@@ -503,7 +497,7 @@ class Portfolio:
                 day_sum += order.sum * c1 / c2
             s += day_sum
 
-            if date < time_range.start:
+            if time_range.start and date < time_range.start:
                 continue
 
             day_value = Value()
@@ -521,7 +515,7 @@ class Portfolio:
     def get_commission_history(self, time_range, currency=RUB):
         return self._get_history(CommissionManager, time_range, currency)
 
-    def get_fund_history(self, cash_data, fund, currency=RUB):
+    def get_fund_history(self, cash_data, fund, time_range, currency=RUB):
         cur_range = TimeRange(key_to_date(cash_data[0].key),
                               key_to_date(cash_data[-1].key))
         quotes = QuotesManager.get_quotes(fund, cur_range)
@@ -537,6 +531,9 @@ class Portfolio:
             if abs(cash_day.value - prev_value) > 0:
                 c += (cash_day.value - prev_value)/price
             prev_value = cash_day.value
+
+            if cash_day.key < time_range.start:
+                continue
 
             day_value = Value()
             day_value.key = cash_day.key

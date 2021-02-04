@@ -4,7 +4,7 @@ reports
 __pycache__
 portfolio/secret.py
 examples
-test_*.py
+test*.py
 main_debug.py
 *.xml
 parse_*.py
