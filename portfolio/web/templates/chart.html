@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="chart"></div>
+<script type="text/javascript" src=/static/js/d3.min.js></script>
+<script type="text/javascript" src=/static/js/plotly-basic.min.js></script>
+<script type="text/javascript">
+    var data = {{data | safe}};
+    Plotly.newPlot("chart", data.data, data.layout || {});
+</script>
+{% endblock %}

@@ -120,13 +120,13 @@ class ValueList(list):
             result.append(value)
         return result
 
-    def __next__(self):
-        try:
-            r = self[self.i].value
-            self.i += 1
-        except KeyError:
-            raise StopIteration
-        return r
+    def keys(self):
+        for i in range(len(self)):
+            yield key_to_date(self[i].key)
+
+    def values(self):
+        for i in range(len(self)):
+            yield self[i].value
 
 
 class TimeRange:
@@ -184,15 +184,18 @@ class DBManager:
         sort = kwargs.pop('sort', None)
         first = kwargs.pop('first', False)
         fields = kwargs.pop('fields', {})
-        for key, value in kwargs.items():
+        for key in list(kwargs.keys()):
+            value = kwargs[key]
             if isinstance(value, TimeRange):
                 if value.start_time and value.end_time:
                     kwargs[key] = {'$gte': value.start_time,
                                    '$lte': value.end_time}
-                if value.start_time and not value.end_time:
+                elif value.start_time and not value.end_time:
                     kwargs[key] = {'$gte': value.start_time}
-                if not value.start_time and value.end_time:
+                elif not value.start_time and value.end_time:
                     kwargs[key] = {'$lte': value.end_time}
+                else:
+                    kwargs.pop(key)
 
         if sort and not isinstance(sort, list):
             sort = [sort]

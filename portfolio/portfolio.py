@@ -109,7 +109,7 @@ class Portfolio:
             day_orders = operations[date]
             self._update_portfolio_dict(portfolio, day_orders)
 
-            if date < time_range.start:
+            if time_range.start is not None and date < time_range.start:
                 continue
 
             if date in usd:
@@ -242,8 +242,8 @@ class Portfolio:
                 c = eur
                 position = c * quantity
             else:
-                if isin in self.changes:
-                    isin = self.changes[isin]
+                if isin in self.CHANGES:
+                    isin = self.CHANGES[isin]
                 c1 = QuotesLoader.current(isin)
 
                 security = SecuritiesManager.get_data(isin=isin)
@@ -301,7 +301,7 @@ class Portfolio:
         state = tabulate(data, headers=["Ration name", "Value"])
         print(state)
 
-    def get_state(self):
+    def get_state(self, total=True):
         usd = QuotesLoader.current(self.USD)
         eur = QuotesLoader.current(self.EUR)
 
@@ -336,8 +336,8 @@ class Portfolio:
                 c = eur
                 position = c * quantity
             else:
-                if isin in self.changes:
-                    isin = self.changes[isin]
+                if isin in self.CHANGES:
+                    isin = self.CHANGES[isin]
                 c1 = QuotesLoader.current(isin)
 
                 security = SecuritiesManager.get_data(isin=isin)
@@ -366,7 +366,8 @@ class Portfolio:
                 state_asset.append([ticker, name, quantity, sec_cur,
                                     position_orig, position])
                 asset_sum += position
-        state_asset.append(['All', '', '', '', '', asset_sum])
+        if total:
+            state_asset.append(['All', '', '', '', '', asset_sum])
         return state_asset, state_cur
 
     def show_state(self):
@@ -416,18 +417,20 @@ class Portfolio:
             if date in eur:
                 prev_price[self.EUR] = eur[date]
 
-            if date >= time_range.start:
-                if currency == self.USD:
-                    c3 = usd.get(date, prev_price[self.USD])
-                elif currency == self.EUR:
-                    c3 = eur.get(date, prev_price[self.EUR])
-                else:
-                    c3 = 1
+            if time_range.start is not None and date < time_range.start:
+                continue
 
-                day_value = Value()
-                day_value.key = date
-                day_value.value = (s + proc) / c3
-                cash.append(day_value)
+            if currency == self.USD:
+                c3 = usd.get(date, prev_price[self.USD])
+            elif currency == self.EUR:
+                c3 = eur.get(date, prev_price[self.EUR])
+            else:
+                c3 = 1
+
+            day_value = Value()
+            day_value.key = date
+            day_value.value = (s + proc) / c3
+            cash.append(day_value)
 
             prev = s
         return cash

@@ -7,8 +7,9 @@ def create_app():
         SECRET_KEY='123456'
     )
 
-    from portfolio.web.routes import tables, forms, pages
+    from portfolio.web.routes import tables, forms, pages, charts
     app.register_blueprint(tables.tables)
     app.register_blueprint(forms.forms)
     app.register_blueprint(pages.pages)
+    app.register_blueprint(charts.charts)
     return app
