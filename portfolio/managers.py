@@ -31,7 +31,7 @@ class QuotesManager(DBManager):
             last = record
         last_date = last['time'] if last else time_range.start_time
 
-        if new_range.end is None or date_to_key(last_date) < new_range.end:
+        if date_to_key(last_date) < new_range.end:
             if last is not None:
                 last_date += timedelta(days=1)
                 last_date = last_date.replace(hour=0, minute=0, second=0)

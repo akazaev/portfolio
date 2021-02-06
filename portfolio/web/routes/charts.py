@@ -46,17 +46,18 @@ RANGE_LAYOUT = {
 
 @charts.route('/value')
 def value_chart():
-    portfolio = Portfolio(1)
+    cur = request.args.get('cur', Portfolio.RUB)
+    broker = request.args.get('broker')
+
+    portfolio = Portfolio(1, broker_id=int(broker) if broker else None)
     start_date = None
     end_date = datetime.now() - timedelta(days=1)
     time_range = TimeRange(start_date, end_date)
-    cur = request.args.get('cur', Portfolio.RUB)
 
     data = portfolio.get_value_history(time_range, currency=cur)
     cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
     cash_data = portfolio.get_cash_history(time_range, currency=cur)
-    dividend_data = portfolio.get_dividend_history(time_range, currency=cur)
-    samples = [dividend_data + data, cbr_data, cash_data]
+    samples = [data, cbr_data, cash_data]
 
     data = {
         'data': [],
@@ -76,11 +77,12 @@ def value_chart():
 
 @charts.route('/profit')
 def profit_chart():
-    portfolio = Portfolio(1)
     start_date = None
     end_date = datetime.now() - timedelta(days=1)
     time_range = TimeRange(start_date, end_date)
     cur = request.args.get('cur', Portfolio.RUB)
+    broker = request.args.get('broker')
+    portfolio = Portfolio(1, broker_id=int(broker) if broker else None)
 
     data = portfolio.get_value_history(time_range, currency=cur)
     cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
@@ -118,9 +120,7 @@ def profit_percent_chart():
     data = portfolio.get_value_history(time_range, currency=cur)
     cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
     cash_data = portfolio.get_cash_history(time_range, currency=cur)
-    dividend_data = portfolio.get_dividend_history(time_range, currency=cur)
     samples = [100 * (data - cash_data) / cash_data,
-               100 * (data + dividend_data - cash_data) / cash_data,
                100 * (cbr_data - cash_data) / cash_data]
 
     data = {

@@ -11,7 +11,7 @@ from portfolio.config import CBR_RATE, CBR_BASE_RATE
 from portfolio.loaders import QuotesLoader
 from portfolio.managers import (
     QuotesManager, OrdersManager, MoneyManagerCached, SecuritiesManager,
-    Order, Money, DividendManager, CommissionManager)
+    Order, Money, Commission, Dividend, DividendManager, CommissionManager)
 
 
 class Portfolio:
@@ -59,25 +59,18 @@ class Portfolio:
                                             currency=currency)
                       for fund in self.FUNDS]
 
-        self.add_charts(dividend_data + data, cbr_data, cash_data, data,
-                        step=50000)
-        self.add_charts(dividend_data + data, cbr_data, *funds_data,
-                        step=50000)
-        self.add_charts(dividend_data + data - cash_data, cbr_data - cash_data,
-                        *[data - cash_data for data in funds_data],
-                        step=50000)
+        self.add_charts(data, cbr_data, cash_data, step=50000)
+        self.add_charts(data, cbr_data, *funds_data, step=50000)
+        self.add_charts(data - cash_data, cbr_data - cash_data,
+                        *[data - cash_data for data in funds_data], step=50000)
         self.add_charts(data - cash_data, cbr_data - cash_data,
                         dividend_data, commission_data)
         self.add_charts(100 * (data - cash_data) / cash_data,
-                        100 * (data + dividend_data - cash_data) / cash_data,
                         100 * (cbr_data - cash_data) / cash_data, step=10)
 
         self.show_charts()
 
     def get_value_history(self, time_range, currency=RUB):
-        usd = QuotesManager.get_quotes(self.USD, time_range)
-        eur = QuotesManager.get_quotes(self.EUR, time_range)
-
         value = ValueList('value')
         prev_price = {}
         portfolio = defaultdict(int)
@@ -87,17 +80,22 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManagerCached.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = money_orders + stock_orders
+        dividend_orders = DividendManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        commission_orders = CommissionManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        all_orders = money_orders + dividend_orders + stock_orders
+        all_orders += commission_orders
         all_orders.sort(key=lambda x: x[0])
 
         cur_range = TimeRange(key_to_date(all_orders[0].date),
                               time_range.end_time)
+        usd = QuotesManager.get_quotes(self.USD, cur_range)
+        eur = QuotesManager.get_quotes(self.EUR, cur_range)
         dates = self.get_dates(cur_range)
 
         for order in all_orders:
             operations[order.date].append(order)
-            if isinstance(order, Money):
-                continue
             if isinstance(order, Order):
                 quantity = order.quantity
                 portfolio[order.isin] += quantity
@@ -131,7 +129,7 @@ class Portfolio:
                 else:
                     if isin in self.CHANGES:
                         isin = self.CHANGES[isin]
-                    candles = QuotesManager.get_quotes(isin, time_range)
+                    candles = QuotesManager.get_quotes(isin, cur_range)
                     if date in candles:
                         c1 = candles[date]
                         prev_price[isin] = c1
@@ -197,8 +195,10 @@ class Portfolio:
                         raise ValueError()
                 else:
                     portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
-            if isinstance(order, Money):
+            if isinstance(order, (Money, Dividend)):
                 portfolio[(cur, cur)] += sum
+            if isinstance(order, Commission):
+                portfolio[(cur, cur)] -= sum
 
     def get_value(self):
         usd_based = (
@@ -218,7 +218,12 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManagerCached.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = money_orders + stock_orders
+        dividend_orders = DividendManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        commission_orders = CommissionManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        all_orders = money_orders + dividend_orders + stock_orders
+        all_orders += commission_orders
         all_orders.sort(key=lambda x: x[0])
 
         portfolio = defaultdict(int)
@@ -310,7 +315,12 @@ class Portfolio:
             self.portfolio_id, orders_range, broker_id=self.broker_id)
         money_orders = MoneyManagerCached.get_data(
             self.portfolio_id, orders_range, broker_id=self.broker_id)
-        all_orders = money_orders + stock_orders
+        dividend_orders = DividendManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        commission_orders = CommissionManager.get_data(
+            self.portfolio_id, orders_range, broker_id=self.broker_id)
+        all_orders = money_orders + dividend_orders + stock_orders
+        all_orders += commission_orders
         all_orders.sort(key=lambda x: x[0])
 
         portfolio = defaultdict(int)

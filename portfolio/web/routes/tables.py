@@ -1,4 +1,4 @@
-from flask import Blueprint, templating
+from flask import Blueprint, templating, request
 from flask_table import Table, Col
 
 from portfolio.managers import MoneyManager, OrdersManager, DividendManager
@@ -21,7 +21,9 @@ class MoneyTable(BaseTable):
 
 @tables.route('/money')
 def money_table():
-    items = MoneyManager.get_data(sort=-1)
+    broker = request.args.get('broker')
+    items = MoneyManager.get_data(broker_id=int(broker) if broker else None,
+                                  sort=-1)
     table = MoneyTable(items, classes=['table', 'table-dark'])
     return templating.render_template('table.html', table=table)
 
@@ -33,7 +35,9 @@ class OrdersTable(BaseTable):
 
 @tables.route('/orders')
 def orders_table():
-    items = OrdersManager.get_data(sort=-1)
+    broker = request.args.get('broker')
+    items = OrdersManager.get_data(broker_id=int(broker) if broker else None,
+                                   sort=-1)
     table = OrdersTable(items, classes=['table', 'table-dark'])
     return templating.render_template('table.html', table=table)
 
@@ -72,6 +76,8 @@ class DividendsTable(BaseTable):
 
 @tables.route('/dividends')
 def dividends_table():
-    items = DividendManager.get_data(sort=-1)
+    broker = request.args.get('broker')
+    items = DividendManager.get_data(broker_id=int(broker) if broker else None,
+                                     sort=-1)
     table = DividendsTable(items, classes=['table', 'table-dark'])
     return templating.render_template('table.html', table=table)
