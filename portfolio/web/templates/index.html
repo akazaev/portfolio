@@ -1,17 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="padding">
     <a href="/tables/portfolio">Portfolio table</a><br/>
     <a href="/tables/money">Money table</a><br/>
     <a href="/tables/dividends">Dividends table</a><br/>
     <a href="/tables/orders">Orders table</a><br/>
+</div>
+<div class="padding">
     <a href="/forms/order">Add order</a><br/>
     <a href="/forms/money">Add money</a><br/>
     <a href="/forms/dividend">Add dividend</a><br/>
     <a href="/forms/commission">Add commission</a><br/>
     <a href="/forms/report">Load report</a><br/>
-    <a href="/charts/value">Value chart</a><br/>
-    <a href="/charts/profit">Profit chart</a><br/>
-    <a href="/charts/profit_percent">Profit chart, %</a><br/>
+</div>
+<div class="padding">
+    <a href="/charts/value?cur=RUB">Value chart (RUB)</a><br/>
+    <a href="/charts/value?cur=USD">Value chart (USD)</a><br/>
+    <a href="/charts/profit?cur=RUB">Profit chart (RUB)</a><br/>
+    <a href="/charts/profit?cur=USD">Profit chart (USD)</a><br/>
+    <a href="/charts/profit_percent?cur=RUB">Profit chart (RUB), %</a><br/>
+    <a href="/charts/profit_percent?cur=USD">Profit chart (USD), %</a><br/>
     <a href="/charts/portfolio">Portfolio pie</a><br/>
+</div>
 {% endblock %}

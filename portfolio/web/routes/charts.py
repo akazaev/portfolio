@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import json
 
-from flask import Blueprint, templating
+from flask import Blueprint, templating, request
 import plotly
 
 from portfolio.portfolio import Portfolio,  TimeRange
@@ -50,12 +50,12 @@ def value_chart():
     start_date = None
     end_date = datetime.now() - timedelta(days=1)
     time_range = TimeRange(start_date, end_date)
+    cur = request.args.get('cur', Portfolio.RUB)
 
-    data = portfolio.get_value_history(time_range, currency=Portfolio.RUB)
-    cbr_data = portfolio.get_cbr_history(time_range, currency=Portfolio.RUB)
-    cash_data = portfolio.get_cash_history(time_range, currency=Portfolio.RUB)
-    dividend_data = portfolio.get_dividend_history(time_range,
-                                                   currency=Portfolio.RUB)
+    data = portfolio.get_value_history(time_range, currency=cur)
+    cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
+    cash_data = portfolio.get_cash_history(time_range, currency=cur)
+    dividend_data = portfolio.get_dividend_history(time_range, currency=cur)
     samples = [dividend_data + data, cbr_data, cash_data]
 
     data = {
@@ -80,14 +80,14 @@ def profit_chart():
     start_date = None
     end_date = datetime.now() - timedelta(days=1)
     time_range = TimeRange(start_date, end_date)
+    cur = request.args.get('cur', Portfolio.RUB)
 
-    data = portfolio.get_value_history(time_range, currency=Portfolio.RUB)
-    cbr_data = portfolio.get_cbr_history(time_range, currency=Portfolio.RUB)
-    cash_data = portfolio.get_cash_history(time_range, currency=Portfolio.RUB)
-    dividend_data = portfolio.get_dividend_history(time_range,
-                                                   currency=Portfolio.RUB)
+    data = portfolio.get_value_history(time_range, currency=cur)
+    cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
+    cash_data = portfolio.get_cash_history(time_range, currency=cur)
+    dividend_data = portfolio.get_dividend_history(time_range, currency=cur)
     commission_data = portfolio.get_commission_history(time_range,
-                                                       currency=Portfolio.RUB)
+                                                       currency=cur)
     samples = [data - cash_data, cbr_data - cash_data, dividend_data,
                commission_data]
 
@@ -113,12 +113,12 @@ def profit_percent_chart():
     start_date = None
     end_date = datetime.now() - timedelta(days=1)
     time_range = TimeRange(start_date, end_date)
+    cur = request.args.get('cur', Portfolio.RUB)
 
-    data = portfolio.get_value_history(time_range, currency=Portfolio.RUB)
-    cbr_data = portfolio.get_cbr_history(time_range, currency=Portfolio.RUB)
-    cash_data = portfolio.get_cash_history(time_range, currency=Portfolio.RUB)
-    dividend_data = portfolio.get_dividend_history(time_range,
-                                                   currency=Portfolio.RUB)
+    data = portfolio.get_value_history(time_range, currency=cur)
+    cbr_data = portfolio.get_cbr_history(time_range, currency=cur)
+    cash_data = portfolio.get_cash_history(time_range, currency=cur)
+    dividend_data = portfolio.get_dividend_history(time_range, currency=cur)
     samples = [100 * (data - cash_data) / cash_data,
                100 * (data + dividend_data - cash_data) / cash_data,
                100 * (cbr_data - cash_data) / cash_data]
