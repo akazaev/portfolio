@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    {% for table in tables %}
+    <div class="col-sm-5">
+        {{ table.title }}({{ table.items|length }})
+        {{ table }}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

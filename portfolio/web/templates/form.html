@@ -1,11 +1,19 @@
 {% extends "base.html" %}
 
 {% block content %}
+<script>
+$(document).ready(function () {
+    $('#test_submit').click(function(){
+        $('#test').val("1");
+        $('#form').submit();
+    })
+});
+</script>
 <div class="container-fluid">
     <div class="col-sm-1">
-    <form action="{{ url_for(request.endpoint) }}" method="post" enctype="multipart/form-data">
+    <form action="{{ url_for(request.endpoint) }}" id="form" method="post" enctype="multipart/form-data">
         {{ form.hidden_tag() }}
-        {% for field in form if field.name != 'csrf_token' %}
+        {% for field in form if field.name != 'csrf_token' and field.name != 'test' %}
             <div class="form-group">
                 {{ field.label() }}
                 {{ field(class_="form-control") }}
@@ -15,6 +23,7 @@
             </div>
         {% endfor %}
         <input type="submit" value="Add" class="btn btn-primary">
+        <input type="submit" id="test_submit" value="Test" class="btn btn-primary">
     </form>
     </div>
 </div>

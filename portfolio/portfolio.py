@@ -3,7 +3,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from tabulate import tabulate
-import matplotlib.pyplot as plt
 
 from portfolio.base import (
     TimeRange, Value, ValueList, date_to_key, key_to_date, sround)
@@ -100,7 +99,7 @@ class Portfolio:
                 quantity = order.quantity
                 portfolio[order.isin] += quantity
                 if portfolio[order.isin] < 0:
-                    raise ValueError()
+                    raise ValueError(order.isin)
 
         portfolio = defaultdict(int)
         for date in dates:
@@ -309,6 +308,8 @@ class Portfolio:
     def get_state(self, total=True):
         usd = QuotesLoader.current(self.USD)
         eur = QuotesLoader.current(self.EUR)
+        usd = usd or 0
+        eur = eur or 0
 
         orders_range = TimeRange(None, datetime.now())
         stock_orders = OrdersManager.get_data(
@@ -555,6 +556,8 @@ class Portfolio:
         return history
 
     def add_charts(self, *args, step=10000):
+        import matplotlib.pyplot as plt
+
         assert args
         figure = plt.figure()
         ax = figure.add_subplot()
@@ -599,4 +602,6 @@ class Portfolio:
         ax.set_title(f'{d1[0]}-{d1[1]}-{d1[2]} - {d2[0]}-{d2[1]}-{d2[2]}')
 
     def show_charts(self):
+        import matplotlib.pyplot as plt
+
         plt.show()

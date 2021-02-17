@@ -12,11 +12,10 @@ class BaseTable(Table):
     sum = Col('Sum')
     cur = Col('Cur')
     broker = Col('Broker')
-    comment = Col('Comment')
 
 
 class MoneyTable(BaseTable):
-    pass
+    title = 'Money'
 
 
 @tables.route('/money')
@@ -29,6 +28,7 @@ def money_table():
 
 
 class OrdersTable(BaseTable):
+    title = 'Orders'
     isin = Col('ISIN')
     quantity = Col('quantity')
 
@@ -53,7 +53,9 @@ class PortfolioTable(Table):
 
 @tables.route('/portfolio')
 def portfolio_table():
-    portfolio = Portfolio(portfolio_id=1)
+    broker = request.args.get('broker')
+    portfolio = Portfolio(broker_id=int(broker) if broker else None,
+                          portfolio_id=1)
     state_asset, state_cur = portfolio.get_state()
     items = []
     for item in state_asset:
@@ -71,7 +73,11 @@ def portfolio_table():
 
 
 class DividendsTable(BaseTable):
-    pass
+    title = 'Dividends'
+
+
+class CommissionTable(BaseTable):
+    title = 'Commission'
 
 
 @tables.route('/dividends')

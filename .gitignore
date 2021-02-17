@@ -8,3 +8,4 @@ test*.py
 main_debug.py
 *.xml
 parse_*.py
+*.json

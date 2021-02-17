@@ -2,7 +2,8 @@ import datetime
 
 from flask import Blueprint, templating, redirect, request
 from flask_wtf import FlaskForm, file
-from wtforms import StringField, FloatField, IntegerField, SelectField
+from wtforms import (
+    StringField, FloatField, IntegerField, SelectField, HiddenField)
 from wtforms.validators import DataRequired
 from wtforms.fields.html5 import DateField
 
@@ -10,7 +11,8 @@ from wtforms.fields.html5 import DateField
 from portfolio.portfolio import Portfolio
 from portfolio.managers import OrdersManager, MoneyManager, DividendManager
 from portfolio.parsers import parse
-from portfolio.web.routes.tables import MoneyTable
+from portfolio.web.routes.tables import (
+    OrdersTable, MoneyTable, DividendsTable, CommissionTable)
 
 
 forms = Blueprint('forms', __name__, url_prefix='/forms')
@@ -99,6 +101,7 @@ class ReportForm(FlaskForm):
                              (Portfolio.VTB, Portfolio.VTB),
                          ))
     report = file.FileField(validators=[file.FileRequired()])
+    test = HiddenField('test')
 
 
 @forms.route('/report', methods=('GET', 'POST'))
@@ -107,8 +110,14 @@ def load_report():
     if form.validate_on_submit():
         content = request.files['report'].read()
         broker = form.data['broker']
-        items = parse(content, broker)
+        test = bool(form.data['test'])
+        orders, money, dividend, commission = parse(content, broker, test=test)
 
-        table = MoneyTable(items, classes=['table', 'table-dark'])
-        return templating.render_template('table.html', table=table)
+        tables = [
+            OrdersTable(orders, classes=['table', 'table-dark']),
+            MoneyTable(money, classes=['table', 'table-dark']),
+            DividendsTable(dividend, classes=['table', 'table-dark']),
+            CommissionTable(commission, classes=['table', 'table-dark'])
+        ]
+        return templating.render_template('tables.html', tables=tables)
     return templating.render_template('form.html', form=form)
