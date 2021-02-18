@@ -8,199 +8,162 @@ from portfolio.managers import (
 from portfolio.portfolio import Portfolio
 
 
-def get_child(root, child_tag):
-    for child in root:
-        if child_tag in child.tag:
-            return child
-    raise ValueError('not found')
+class Parser:
+    BROKER = None
+
+    def __init__(self, portfolio):
+        self.portfolio = {'portfolio': portfolio, 'broker': self.BROKER}
+
+    @classmethod
+    def get_child(cls, root, child_tag):
+        for child in root:
+            if child_tag in child.tag:
+                return child
+        raise ValueError('not found')
+
+    @classmethod
+    def get(cls, root, *names):
+        if len(names) == 1:
+            names = names[0]
+            names = names.split('.')
+        for name in names:
+            root = cls.get_child(root, name)
+            if root is None:
+                raise ValueError('not found')
+        return root
 
 
-def get(root, *names):
-    if len(names) == 1:
-        names = names[0]
-        names = names.split('.')
-    for name in names:
-        root = get_child(root, name)
-        if root is None:
-            raise ValueError('not found')
-    return root
+class AlfaParser(Parser):
+    BROKER = 1
+    MARKETS = {
+        'МБ ФР': 'MB',
+        'КЦ МФБ': 'SPB',
+        'СПБ': 'SPB',
+        'МБ ВР': 'MB',
+        'OTC НРД': 'MB',
+    }
 
-
-ALFA_MARKETS = {
-    'МБ ФР': 'MB',
-    'КЦ МФБ': 'SPB',
-    'СПБ': 'SPB',
-    'МБ ВР': 'MB',
-    'OTC НРД': 'MB',
-}
-
-
-VTB_MARKETS = {
-    'Фондовый рынок ПАО Московская Биржа': 'MB',
-    'ПАО “Санкт-Петербургская Биржа”': 'SPB',
-    'Валютный рынок ПАО Московская биржа': 'MB',
-}
-
-
-def parse_alfa_report(content, broker_id=1, test=True):
-    def parse_record(record):
+    @classmethod
+    def parse_record(cls, record):
         date = record.attrib['last_update']
-        curs = get(record, 'oper_type', 'comment',
-                   'money_volume_begin1_Collection',
-                   'money_volume_begin1', 'p_code_Collection')
+        curs = cls.get(record, 'oper_type', 'comment',
+                       'money_volume_begin1_Collection',
+                       'money_volume_begin1', 'p_code_Collection')
         for cur in curs:
-            volume = get(cur, 'p_code').attrib.get('volume')
+            volume = cls.get(cur, 'p_code').attrib.get('volume')
             if volume:
-                cur_code = get(cur, 'p_code').attrib['p_code']
+                cur_code = cls.get(cur, 'p_code').attrib['p_code']
                 time = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
                 return time, float(volume), cur_code
         raise ValueError('unable to parse')
 
-    root = etree.fromstring(content)
+    def parse(self, content, test=True):
+        root = etree.fromstring(content)
+        items = []
 
-    # orders section
-    collection = get(root, 'Trades', 'Report', 'Tablix2', 'Details_Collection')
-    orders = []
+        # orders section
+        collection = self.get(root, 'Trades', 'Report',
+                              'Tablix2', 'Details_Collection')
+        for record in collection:
+            isin = record.attrib['isin_reg'].strip()
+            if not isin:
+                isin = record.attrib['p_name'].strip()
+                assert isin in ('EUR', 'USD')
 
-    for record in collection:
-        date = datetime.strptime(
-            ' '.join(record.attrib['db_time'].strip().split()[:2]),
-            '%d.%m.%Y %H:%M:%S')
-        isin = record.attrib['isin_reg'].strip()
-        if not isin:
-            isin = record.attrib['p_name'].strip()
-            assert isin in ('EUR', 'USD')
+            market = record.attrib['place_name']
+            comment = record.attrib.get('comment')
+            if comment:
+                continue
+            if market == 'МБ ВР':
+                continue
 
-        market = record.attrib['place_name']
-        comment = record.attrib.get('comment')
-        if comment:
-            continue
-        if market == 'МБ ВР':
-            continue
+            data = {
+                'date': datetime.strptime(
+                    ' '.join(record.attrib['db_time'].strip().split()[:2]),
+                    '%d.%m.%Y %H:%M:%S'),
+                'quantity': int(float(record.attrib['qty'])),
+                'price': float(record.attrib['Price']),
+                'sum': float(record.attrib['summ_trade']),
+                'cur': record.attrib['curr_calc'],
+                'market': self.MARKETS[market],
+                'isin': isin,
+                **self.portfolio,
+            }
 
-        quantity = int(float(record.attrib['qty']))
-        price = float(record.attrib['Price'])
-        sum = float(record.attrib['summ_trade'])
-        cur = record.attrib['curr_calc']
-        market = ALFA_MARKETS[market]
-
-        result = OrdersManager.get(date=date, isin=isin,
-                                   quantity=quantity,
-                                   sum=sum, cur=cur, market=market,
-                                   portfolio=1, broker=broker_id,
-                                   first=True)
-
-        if result is None:
             security = SecuritiesManager.get(isin=isin, first=True)
             security_type = security['type']
-            if security_type in ('Stock', 'Etf'):
-                data = dict(portfolio=1, broker=broker_id,
-                            sum=sum, cur=cur,
-                            date=date, market=market, isin=isin,
-                            quantity=quantity, price=price)
-            elif security_type == 'Bond':
-                faceValue = security['faceValue']
-                data = dict(portfolio=1, broker=broker_id,
-                            sum=sum, cur=cur,
-                            date=date, market=market, isin=isin,
-                            quantity=quantity,
-                            price=faceValue * price / 100)
-            else:
+            if security_type == 'Bond':
+                data['price'] = security['faceValue'] * data['price'] / 100
+            elif security_type not in ('Stock', 'Etf',):
                 raise ValueError(security_type)
 
-            if not test:
+            if OrdersManager.get_first(**data) is not None:
+                continue
+
+            if test:
+                items.append(Order(**data))
+            else:
                 #OrdersManager.insert(data)
-                result = OrdersManager.upsert(data)
-            if test and not result or 'upserted' in result:
-                item = Order(**data)
-                orders.append(item)
+                if 'upserted' in OrdersManager.upsert(data):
+                    items.append(Order(**data))
 
-    # money transfer section
-    collection = get(root, 'Trades2', 'Report', 'Tablix1',
-                     'settlement_date_Collection')
-    money = []
-    dividend = []
-    commission = []
+        # money transfer section
+        collection = self.get(root, 'Trades2', 'Report', 'Tablix1',
+                              'settlement_date_Collection')
+        for day in collection:
+            for record in self.get(day, 'rn_Collection'):
+                time, volume, cur_code = self.parse_record(record)
+                oper_type = self.get(record, 'oper_type').attrib[
+                    'oper_type'].strip()
+                comment = self.get(record, 'oper_type', 'comment').attrib[
+                    'comment'].lower()
 
-    for day in collection:
-        for record in get(day, 'rn_Collection'):
-            oper_type = get(record, 'oper_type').attrib['oper_type'].strip()
-            comment = get(record, 'oper_type', 'comment').attrib[
-                'comment'].lower()
-
-            if oper_type == 'Перевод':
-                if any(word in comment for word in (
-                        'купон', 'dividend', 'дивиденд')):
-                    time, volume, cur_code = parse_record(record)
-                    data = {
-                        'portfolio': 1,
-                        'sum': volume,
-                        'broker': 1,
-                        'comment': comment,
-                        'cur': cur_code,
-                        'date': time
-                    }
-                    if test:
-                        result = DividendManager.get(**data, first=True)
+                if oper_type == 'Перевод':
+                    if any(word in comment for word in (
+                            'купон', 'dividend', 'дивиденд')):
+                        manager = DividendManager
+                        model = Dividend
+                    elif any(word in comment for word in (
+                            'списание по поручению клиента', 'между рынками',
+                            'из ао "альфа-банк"')):
+                        manager = MoneyManager
+                        model = Money
                     else:
-                        result = DividendManager.upsert(data)
-                    if test and not result or 'upserted' in result:
-                        print(data)
-                        item = Dividend(date=time, cur=cur_code, sum=volume,
-                                        portfolio=1, broker=broker_id,
-                                        comment=comment)
-                        dividend.append(item)
-                elif any(word in comment for word in (
-                        'списание по поручению клиента', 'между рынками',
-                        'из ао "альфа-банк"')):
-                    time, volume, cur_code = parse_record(record)
-                    data = {
-                        'portfolio': 1,
-                        'sum': volume,
-                        'broker': 1,
-                        'comment': comment,
-                        'cur': cur_code,
-                        'date': time
-                    }
-                    if test:
-                        result = MoneyManager.get(**data, first=True)
-                    else:
-                        result = MoneyManager.upsert(data)
-                    if test and not result or 'upserted' in result:
-                        print(data)
-                        item = Money(date=time, cur=cur_code, sum=volume,
-                                     portfolio=1, broker=broker_id,
-                                     comment=comment)
-                        money.append(item)
+                        raise ValueError(comment)
+                elif oper_type == 'Комиссия' or oper_type == 'НДФЛ':
+                    manager = CommissionManager
+                    model = Commission
+                    volume = abs(volume)
                 else:
-                    raise ValueError(comment)
-            elif oper_type == 'Комиссия' or oper_type == 'НДФЛ':
-                time, volume, cur_code = parse_record(record)
+                    if oper_type not in ('НКД по сделке', 'Расчеты по сделке'):
+                        raise ValueError(oper_type)
+                    continue
+
                 data = {
-                    'portfolio': 1,
-                    'sum': abs(volume),
-                    'broker': 1,
+                    'sum': volume,
                     'comment': comment,
                     'cur': cur_code,
-                    'date': time
+                    'date': time,
+                    **self.portfolio,
                 }
                 if test:
-                    result = CommissionManager.get(**data, first=True)
+                    if manager.get_first(**data) is None:
+                        items.append(model(**data))
                 else:
-                    result = CommissionManager.upsert(data)
-                if test and not result or 'upserted' in result:
-                    print(data)
-                    item = Commission(date=time, cur=cur_code, sum=abs(volume),
-                                      comment=comment, portfolio=1,
-                                      broker=broker_id)
-                    commission.append(item)
-            else:
-                if oper_type not in ('НКД по сделке', 'Расчеты по сделке'):
-                    raise ValueError(oper_type)
-    return orders, money, dividend, commission
+                    if 'upserted' in manager.upsert(data):
+                        items.append(model(**data))
+        return items
 
 
-def parse_vtb_report(content, broker_id=2, test=True):
+class VtbParser(Parser):
+    BROKER = 2
+    MARKETS = {
+        'Фондовый рынок ПАО Московская Биржа': 'MB',
+        'ПАО “Санкт-Петербургская Биржа”': 'SPB',
+        'Валютный рынок ПАО Московская биржа': 'MB',
+    }
+
+    @staticmethod
     def parse_record(record):
         date = record.attrib['debt_type4']
         cur_code = record.attrib['decree_amount2']
@@ -210,175 +173,135 @@ def parse_vtb_report(content, broker_id=2, test=True):
         time = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
         return time, float(volume), cur_code
 
-    root = etree.fromstring(content)
+    def parse(self, content, test=True):
+        root = etree.fromstring(content)
+        items = []
 
-    # orders section
-    orders = []
-    collection = get(root, 'Tablix_b9', 'Подробности9_Collection')
+        # orders section
+        collection = self.get(root, 'Tablix_b9', 'Подробности9_Collection')
+        for record in collection:
+            cur = record.attrib['deal_count7']
+            if cur == 'RUR':
+                cur = 'RUB'
 
-    for record in collection:
-        date = datetime.strptime(record.attrib['curs_datebeg9'],
-                                 '%Y-%m-%dT%H:%M:%S')
-        isin = record.attrib['NameBeg9'].strip().split(',')[-1].strip()
-        quantity = int(float(record.attrib['NameEnd9']))
-        price = float(record.attrib['deal_price7'])
-        sum = float(record.attrib['currency_paym7'])
-        cur = record.attrib['deal_count7']
-        if cur == 'RUR':
-            cur = 'RUB'
-        market = VTB_MARKETS[record.attrib['deal_place7']]
+            quantity = int(float(record.attrib['NameEnd9']))
+            if record.attrib['currency_ISO9'] != 'Покупка':
+                quantity = -quantity
 
-        if record.attrib['currency_ISO9'] != 'Покупка':
-            quantity = -quantity
+            isin = record.attrib['NameBeg9'].strip().split(',')[-1].strip()
+            data = {
+                'market': self.MARKETS[record.attrib['deal_place7']],
+                'date': datetime.strptime(record.attrib['curs_datebeg9'],
+                                          '%Y-%m-%dT%H:%M:%S'),
+                'isin': isin,
+                'quantity': quantity,
+                'price': float(record.attrib['deal_price7']),
+                'sum': float(record.attrib['currency_paym7']),
+                'cur': cur,
+                **self.portfolio,
+            }
 
-        result = OrdersManager.get(date=date, isin=isin,
-                                   quantity=quantity,
-                                   sum=sum, cur=cur, market=market,
-                                   portfolio=1, broker=2,
-                                   first=True)
-        if result is None:
             security = SecuritiesManager.get(isin=isin, first=True)
             security_type = security['type']
-            if security_type in ('Stock', 'Etf'):
-                data = dict(portfolio=1, broker=2,
-                            sum=sum, cur=cur,
-                            date=date, market=market, isin=isin,
-                            quantity=quantity, price=price)
-            elif security_type == 'Bond':
+            if security_type == 'Bond':
                 faceValue = security['faceValue']
-                data = dict(portfolio=1, broker=2,
-                            sum=sum, cur=cur,
-                            date=date, market=market, isin=isin,
-                            quantity=quantity,
-                            price=faceValue * price / 100)
-            else:
+                data['price'] = faceValue * data['price'] / 100
+            elif security_type not in ('Stock', 'Etf',):
                 raise ValueError(security_type)
-            if not test:
-                result = OrdersManager.upsert(data)
-            if test and not result or 'upserted' in result:
-                item = Order(**data)
-                orders.append(item)
 
-    collection = get(root, 'Tablix_b10', 'Подробности6_Collection')
+            if OrdersManager.get_first(**data) is not None:
+                continue
 
-    for record in collection:
-        date = datetime.strptime(record.attrib['curs_datebeg6'],
-                                 '%Y-%m-%dT%H:%M:%S')
-        isin = record.attrib['NameBeg6'].strip()[:3]
-        quantity = int(float(record.attrib['NameEnd6']))
-        price = float(record.attrib['deal_count4'])
-        sum = float(record.attrib['currency_price4'])
-        cur = record.attrib['deal_price4']
-        if cur == 'RUR':
-            cur = 'RUB'
-        market = VTB_MARKETS[record.attrib['deal_place4']]
-
-        result = OrdersManager.get(date=date, isin=isin,
-                                   quantity=quantity,
-                                   sum=sum, cur=cur, market=market,
-                                   portfolio=1, broker=2,
-                                   first=True)
-
-        if result is None:
-            data = dict(portfolio=1, broker=2,
-                        sum=sum, cur=cur,
-                        date=date, market=market, isin=isin,
-                        quantity=quantity, price=price)
-            if not test:
-                result = OrdersManager.upsert(data)
-            if test and not result or 'upserted' in result:
-                item = Order(**data)
-                orders.append(item)
-
-    # money transfer section
-    collection = get(root, 'Tablix_b4', 'DDS_place_Collection', 'DDS_place',
-                     'Подробности16_Collection')
-    money = []
-    dividend = []
-    commission = []
-
-    for record in collection:
-        oper_type = record.attrib['operation_type'].strip()
-        comment = record.attrib.get('notes1', '').lower()
-
-        if oper_type == 'Зачисление денежных средств':
-            if any(word in comment for word in ('купон', 'dividend',
-                                                'дивиденд')):
-                time, volume, cur_code = parse_record(record)
-                data = {
-                        'portfolio': 1,
-                        'sum': volume,
-                        'broker': 2,
-                        'comment': comment,
-                        'cur': cur_code,
-                        'date': time
-                }
-                if test:
-                    result = DividendManager.get(**data, first=True)
-                else:
-                    result = DividendManager.upsert(data)
-                if test and not result or 'upserted' in result:
-                    print(data)
-                    item = Dividend(date=time, cur=cur_code, sum=volume,
-                                    portfolio=1, broker=broker_id,
-                                    comment=comment)
-                    dividend.append(item)
-            elif not comment or 'перечисление денежных средств' in comment:
-                time, volume, cur_code = parse_record(record)
-                data = {
-                        'portfolio': 1,
-                        'sum': volume,
-                        'broker': 2,
-                        'comment': comment,
-                        'cur': cur_code,
-                        'date': time
-                }
-                if test:
-                    result = MoneyManager.get(**data, first=True)
-                else:
-                    result = MoneyManager.upsert(data)
-                if test and not result or 'upserted' in result:
-                    print(data)
-                    item = Money(date=time, cur=cur_code, sum=volume,
-                                 portfolio=1, broker=broker_id,
-                                 comment=comment)
-                    money.append(item)
+            if test:
+                items.append(Order(**data))
             else:
-                raise ValueError(comment)
-        elif oper_type == 'Вознаграждение Брокера':
-            time, volume, cur_code = parse_record(record)
+                if 'upserted' in OrdersManager.upsert(data):
+                    items.append(Order(**data))
+
+        # currency orders section
+        collection = self.get(root, 'Tablix_b10', 'Подробности6_Collection')
+        for record in collection:
+            cur = record.attrib['deal_price4']
+            if cur == 'RUR':
+                cur = 'RUB'
+
+            quantity = int(float(record.attrib['NameEnd6']))
+            if record.attrib['currency_ISO6'] != 'Покупка':
+                quantity = -quantity
+
             data = {
-                'portfolio': 1,
-                'sum': abs(volume),
-                'broker': 2,
+                'cur': cur,
+                'date': datetime.strptime(record.attrib['curs_datebeg6'],
+                                         '%Y-%m-%dT%H:%M:%S'),
+                'isin': record.attrib['NameBeg6'].strip()[:3],
+                'quantity': quantity,
+                'price': float(record.attrib['deal_count4']),
+                'sum': float(record.attrib['currency_price4']),
+                'market': self.MARKETS[record.attrib['deal_place4']],
+                **self.portfolio,
+            }
+            if OrdersManager.get_first(**data) is not None:
+                continue
+
+            if test:
+                items.append(Order(**data))
+            else:
+                if 'upserted' in OrdersManager.upsert(data):
+                    items.append(Order(**data))
+
+        # money transfer section
+        collection = self.get(root, 'Tablix_b4', 'DDS_place_Collection',
+                              'DDS_place', 'Подробности16_Collection')
+        for record in collection:
+            oper_type = record.attrib['operation_type'].strip()
+            comment = record.attrib.get('notes1', '').lower()
+
+            time, volume, cur_code = self.parse_record(record)
+            if oper_type == 'Зачисление денежных средств':
+                if any(word in comment for word in ('купон', 'dividend',
+                                                    'дивиденд')):
+                    manager = DividendManager
+                    model = Dividend
+                elif not comment or 'перечисление денежных средств' in comment:
+                    manager = MoneyManager
+                    model = Money
+                else:
+                    raise ValueError(comment)
+            elif oper_type == 'Вознаграждение Брокера':
+                manager = CommissionManager
+                model = Commission
+                volume = abs(volume)
+            else:
+                if oper_type not in (
+                        'Сальдо расчётов по сделкам с ценными бумагами',
+                        'Сальдо расчётов по сделкам с иностранной валютой'):
+                    raise ValueError(oper_type)
+                continue
+
+            data = {
+                'sum': volume,
                 'comment': comment,
                 'cur': cur_code,
-                'date': time
+                'date': time,
+                **self.portfolio,
             }
+
             if test:
-                result = CommissionManager.get(**data, first=True)
+                if manager.get_first(**data) is None:
+                    items.append(model(**data))
             else:
-                result = CommissionManager.upsert(data)
-            if test and not result or 'upserted' in result:
-                print(data)
-                item = Commission(date=time, cur=cur_code, sum=abs(volume),
-                                  comment=comment, portfolio=1,
-                                  broker=broker_id)
-                commission.append(item)
-        else:
-            if oper_type not in (
-                    'Сальдо расчётов по сделкам с ценными бумагами',
-                    'Сальдо расчётов по сделкам с иностранной валютой'):
-                raise ValueError(oper_type)
-    return orders, money, dividend, commission
+                if 'upserted' in manager.upsert(data):
+                    item = model(**data)
+                    items.append(item)
+        return items
 
 
 PARSERS = {
-    Portfolio.ALFA: parse_alfa_report,
-    Portfolio.VTB: parse_vtb_report,
+    Portfolio.ALFA: AlfaParser,
+    Portfolio.VTB: VtbParser,
 }
 
 
 def parse(content, broker, test=True):
-    parser = PARSERS[broker]
-    return parser(content, test=test)
+    parser = PARSERS[broker](1)
+    return parser.parse(content, test=test)

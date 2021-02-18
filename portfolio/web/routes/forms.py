@@ -9,7 +9,9 @@ from wtforms.fields.html5 import DateField
 
 
 from portfolio.portfolio import Portfolio
-from portfolio.managers import OrdersManager, MoneyManager, DividendManager
+from portfolio.managers import (
+    Order, Money, Dividend, Commission,
+    OrdersManager, MoneyManager, DividendManager)
 from portfolio.parsers import parse
 from portfolio.web.routes.tables import (
     OrdersTable, MoneyTable, DividendsTable, CommissionTable)
@@ -111,7 +113,11 @@ def load_report():
         content = request.files['report'].read()
         broker = form.data['broker']
         test = bool(form.data['test'])
-        orders, money, dividend, commission = parse(content, broker, test=test)
+        items = parse(content, broker, test=test)
+        orders = [item for item in items if isinstance(item, Order)]
+        money = [item for item in items if isinstance(item, Money)]
+        dividend = [item for item in items if isinstance(item, Dividend)]
+        commission = [item for item in items if isinstance(item, Commission)]
 
         tables = [
             OrdersTable(orders, classes=['table', 'table-dark']),

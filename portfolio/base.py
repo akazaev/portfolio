@@ -180,6 +180,11 @@ class DBManager:
         db[cls.collection].drop()
 
     @classmethod
+    def get_first(cls, **kwargs):
+        kwargs['first'] = True
+        return cls.get(**kwargs)
+
+    @classmethod
     def get(cls, **kwargs):
         sort = kwargs.pop('sort', None)
         first = kwargs.pop('first', False)
