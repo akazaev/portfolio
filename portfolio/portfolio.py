@@ -115,8 +115,7 @@ class Portfolio:
                 prev_price[self.EUR] = eur[date]
 
             portfolio_sum = 0
-            for key, quantity in portfolio.items():
-                isin, cur = key
+            for isin, quantity in portfolio.items():
                 if isin == self.RUB:
                     portfolio_sum += quantity
                 elif isin == self.USD:
@@ -167,37 +166,16 @@ class Portfolio:
             cur = order.cur
             sum = order.sum
             if isinstance(order, Order):
+                assert sum > 0
                 isin = order.isin
                 quantity = order.quantity
-                if quantity < 0 and not portfolio[(isin, cur)]:
-                    q = abs(quantity)
-                    for tcur in self.CURRENCIES:
-                        if not portfolio[(isin, tcur)]:
-                            continue
-                        sub = min(portfolio[(isin, tcur)], q)
-                        portfolio[(isin, tcur)] -= sub
-                        q -= sub
-                    if q:
-                        raise ValueError()
-                else:
-                    portfolio[(isin, cur)] += quantity
-
-                if quantity > 0 and not portfolio[(cur, cur)]:
-                    s = sum
-                    for tcur in self.CURRENCIES:
-                        if not portfolio[(cur, tcur)]:
-                            continue
-                        sub = min(portfolio[(cur, tcur)], s)
-                        portfolio[(cur, tcur)] -= sub
-                        s -= sub
-                    if s > 0:
-                        raise ValueError()
-                else:
-                    portfolio[(cur, cur)] -= quantity / abs(quantity) * sum
+                portfolio[isin] += quantity
+                portfolio[cur] -= quantity / abs(quantity) * sum
             if isinstance(order, (Money, Dividend)):
-                portfolio[(cur, cur)] += sum
+                portfolio[cur] += sum
             if isinstance(order, Commission):
-                portfolio[(cur, cur)] -= sum
+                assert sum > 0
+                portfolio[cur] -= sum
 
     def get_value(self):
         usd_based = (
@@ -231,10 +209,9 @@ class Portfolio:
         portfolio_sum = 0
         active_sum = 0
         bonds_sum = 0
-        for key, quantity in portfolio.items():
+        for isin, quantity in portfolio.items():
             if not quantity:
                 continue
-            isin, cur = key
             bonds = False
 
             if isin == self.RUB:
@@ -330,12 +307,10 @@ class Portfolio:
         state_asset = []
         asset_sum = 0
         state_cur = []
-        for key, quantity in portfolio.items():
+        for isin, quantity in portfolio.items():
             if not quantity:
                 continue
-            isin, cur = key
-            ticker = name = isin
-            sec_cur = isin
+            ticker = name = sec_cur = isin
             position_orig = quantity
 
             if isin == self.RUB:
