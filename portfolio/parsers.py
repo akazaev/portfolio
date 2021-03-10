@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import chain
 
 import xml.etree.ElementTree as etree
 
@@ -62,29 +63,45 @@ class AlfaParser(Parser):
         items = []
 
         # orders section
-        collection = self.get(root, 'Trades', 'Report',
-                              'Tablix2', 'Details_Collection')
+        collection = chain(self.get(root, 'Trades', 'Report', 'Tablix2',
+                                    'Details_Collection'),
+                           self.get(root, 'Trades', 'Report', 'Tablix3',
+                                    'Details2_Collection'))
         for record in collection:
-            isin = record.attrib['isin_reg'].strip()
+            isin = (record.attrib.get('isin_reg') or
+                    record.attrib.get('isin_reg1')).strip()
             if not isin:
-                isin = record.attrib['p_name'].strip()
+                isin = (record.attrib.get('p_name') or
+                        record.attrib.get('p_name2')).strip()
                 assert isin in ('EUR', 'USD')
 
-            market = record.attrib['place_name']
-            comment = record.attrib.get('comment')
+            market = (record.attrib.get('place_name') or
+                      record.attrib.get('place_name2')).strip()
+            comment = (record.attrib.get('comment') or
+                       record.attrib.get('comment2') or '').strip()
             if comment:
                 continue
             if market == 'МБ ВР':
                 continue
 
+            db_time = (record.attrib.get('db_time') or
+                       record.attrib.get('db_time2')).strip()
+            qty = (record.attrib.get('qty') or
+                   record.attrib.get('qty2')).strip()
+            price = (record.attrib.get('Price') or
+                     record.attrib.get('Price2')).strip()
+            summ_trade = (record.attrib.get('summ_trade') or
+                          record.attrib.get('summ_trade2')).strip()
+            curr_calc = (record.attrib.get('curr_calc') or
+                         record.attrib.get('curr_calc2')).strip()
+
             data = {
-                'date': datetime.strptime(
-                    ' '.join(record.attrib['db_time'].strip().split()[:2]),
-                    '%d.%m.%Y %H:%M:%S'),
-                'quantity': int(float(record.attrib['qty'])),
-                'price': float(record.attrib['Price']),
-                'sum': float(record.attrib['summ_trade']),
-                'cur': record.attrib['curr_calc'],
+                'date': datetime.strptime(' '.join(db_time.split()[:2]),
+                                          '%d.%m.%Y %H:%M:%S'),
+                'quantity': int(float(qty)),
+                'price': float(price),
+                'sum': float(summ_trade),
+                'cur': curr_calc,
                 'market': self.MARKETS[market],
                 'isin': isin,
                 **self.portfolio,
