@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 
 from flask import Blueprint, templating, request
@@ -51,7 +51,7 @@ def value_chart():
 
     portfolio = Portfolio(1, broker_id=int(broker) if broker else None)
     start_date = None
-    end_date = datetime.now() - timedelta(days=1)
+    end_date = datetime.now()
     time_range = TimeRange(start_date, end_date)
 
     data = portfolio.get_value_history(time_range, currency=cur)
@@ -78,7 +78,7 @@ def value_chart():
 @charts.route('/profit')
 def profit_chart():
     start_date = None
-    end_date = datetime.now() - timedelta(days=1)
+    end_date = datetime.now()
     time_range = TimeRange(start_date, end_date)
     cur = request.args.get('cur', Portfolio.RUB)
     broker = request.args.get('broker')
@@ -113,7 +113,7 @@ def profit_chart():
 def profit_percent_chart():
     portfolio = Portfolio(1)
     start_date = None
-    end_date = datetime.now() - timedelta(days=1)
+    end_date = datetime.now()
     time_range = TimeRange(start_date, end_date)
     cur = request.args.get('cur', Portfolio.RUB)
 

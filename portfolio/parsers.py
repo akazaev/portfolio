@@ -33,6 +33,13 @@ class Parser:
                 raise ValueError('not found')
         return root
 
+    @classmethod
+    def get_silent(cls, root, *names):
+        try:
+            return cls.get(root, *names)
+        except ValueError:
+            return []
+
 
 class AlfaParser(Parser):
     BROKER = 1
@@ -65,8 +72,8 @@ class AlfaParser(Parser):
         # orders section
         collection = chain(self.get(root, 'Trades', 'Report', 'Tablix2',
                                     'Details_Collection'),
-                           self.get(root, 'Trades', 'Report', 'Tablix3',
-                                    'Details2_Collection'))
+                           self.get_silent(root, 'Trades', 'Report', 'Tablix3',
+                                           'Details2_Collection'))
         for record in collection:
             isin = (record.attrib.get('isin_reg') or
                     record.attrib.get('isin_reg1')).strip()
@@ -236,7 +243,11 @@ class VtbParser(Parser):
                     items.append(Order(**data))
 
         # currency orders section
-        collection = self.get(root, 'Tablix_b10', 'Подробности6_Collection')
+        try:
+            collection = self.get(root, 'Tablix_b10',
+                                  'Подробности6_Collection')
+        except ValueError:
+            collection = []
         for record in collection:
             cur = record.attrib['deal_price4']
             if cur == 'RUR':

@@ -25,16 +25,22 @@ class QuotesManager(DBManager):
         data = cls.get(isin=isin, time=new_range, sort='time',
                        fields={'time': 1, 'price': 1})
         result = OrderedDict()
-        last = None
+
+        last_date = None
         for record in data:
             result[date_to_key(record['time'])] = record['price']
-            last = record
-        last_date = last['time'] if last else time_range.start_time
+            last_date = record['time']
+            last_date += timedelta(days=1)
 
+        if not last_date:
+            data = OrdersManager.get(isin=isin, sort=('time', -1))
+            if data:
+                last_date = data[0]['date']
+        if not last_date:
+            last_date = time_range.start_time
+
+        last_date = last_date.replace(hour=0, minute=0, second=0)
         if date_to_key(last_date) < new_range.end:
-            if last is not None:
-                last_date += timedelta(days=1)
-                last_date = last_date.replace(hour=0, minute=0, second=0)
             new_range = TimeRange(last_date, new_range.end_time)
             data = QuotesLoader.history(isin, new_range)
             if data:
