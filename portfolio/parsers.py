@@ -285,7 +285,8 @@ class VtbParser(Parser):
             comment = record.attrib.get('notes1', '').lower()
 
             time, volume, cur_code = self.parse_record(record)
-            if oper_type == 'Зачисление денежных средств':
+            if (oper_type == 'Зачисление денежных средств' or
+                    oper_type == 'Дивиденды'):
                 if any(word in comment for word in ('купон', 'dividend',
                                                     'дивиденд')):
                     manager = DividendManager
