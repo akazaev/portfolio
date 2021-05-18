@@ -5,7 +5,7 @@ import xml.etree.ElementTree as etree
 
 from portfolio.managers import (
     Order, Dividend, DividendManager, Commission, CommissionManager,
-    Money, MoneyManager, OrdersManager, SecuritiesManager)
+    Money, MoneyManager, OrdersManager, SecuritiesManager, QuotesLoader)
 from portfolio.portfolio import Portfolio
 
 
@@ -70,11 +70,19 @@ class AlfaParser(Parser):
         items = []
 
         # orders section
-        collection = chain(self.get(root, 'Trades', 'Report', 'Tablix2',
-                                    'Details_Collection'),
-                           self.get_silent(root, 'Trades', 'Report', 'Tablix3',
-                                           'Details2_Collection'))
-        for record in collection:
+        collection1 = self.get(root, 'Trades', 'Report', 'Tablix2')
+        try:
+            collection1 = self.get_child(collection1, 'Details_Collection')
+        except ValueError:
+            collection1 = []
+
+        collection2 = self.get(root, 'Trades', 'Report', 'Tablix3')
+        try:
+            collection2 = self.get_child(collection2, 'Details2_Collection')
+        except ValueError:
+            collection2 = []
+
+        for record in chain(collection1, collection2):
             isin = (record.attrib.get('isin_reg') or
                     record.attrib.get('isin_reg1')).strip()
             if not isin:
@@ -115,6 +123,10 @@ class AlfaParser(Parser):
             }
 
             security = SecuritiesManager.get(isin=isin, first=True)
+            if not security:
+                security = QuotesLoader.get_securities_data(isin)
+                SecuritiesManager.upsert(security)
+
             security_type = security['type']
             if security_type == 'Bond':
                 data['price'] = security['faceValue'] * data['price'] / 100
@@ -186,6 +198,8 @@ class VtbParser(Parser):
         'Фондовый рынок ПАО «Московская биржа»': 'MB',
         'ПАО “Санкт-Петербургская Биржа”': 'SPB',
         'Валютный рынок ПАО Московская биржа': 'MB',
+        'Валютный рынок ПАО «Московская биржа»': 'MB',
+        'ПАО «Санкт-Петербургская биржа»': 'SPB',
     }
 
     @staticmethod
@@ -203,7 +217,11 @@ class VtbParser(Parser):
         items = []
 
         # orders section
-        collection = self.get(root, 'Tablix_b9', 'Подробности9_Collection')
+        collection = self.get(root, 'Tablix_b9')
+        try:
+            collection = self.get_child(collection, 'Подробности9_Collection')
+        except ValueError:
+            collection = []
         for record in collection:
             cur = record.attrib['deal_count7']
             if cur == 'RUR':
@@ -227,6 +245,10 @@ class VtbParser(Parser):
             }
 
             security = SecuritiesManager.get(isin=isin, first=True)
+            if not security:
+                security = QuotesLoader.get_securities_data(isin)
+                SecuritiesManager.upsert(security)
+
             security_type = security['type']
             if security_type == 'Bond':
                 faceValue = security['faceValue']

@@ -49,7 +49,7 @@ class QuotesLoader:
         return last, status == 'T'
 
     @classmethod
-    def _get_broker_data(cls, isin):
+    def _get_orderbook_data(cls, isin):
         from portfolio.managers import SecuritiesManager
         data = SecuritiesManager.get_data(isin=isin)
         figi = data['figi']
@@ -59,6 +59,19 @@ class QuotesLoader:
                                 data={'figi': figi, 'depth': 0},
                                 headers=headers)
         return response.json()['payload']['lastPrice']
+
+    @classmethod
+    def get_securities_data(cls, isin):
+        headers = {'Authorization': f'Bearer {API_TOKEN}'}
+        securities = ('stocks', 'bonds', 'etfs', )
+
+        for sec_type in securities:
+            response = requests.get(API_URL + f'/market/{sec_type}',
+                                    headers=headers)
+            items = response.json()['payload']['instruments']
+            for item in items:
+                if item['isin'] == isin:
+                    return item
 
     @classmethod
     def current(cls, isin):
@@ -71,5 +84,5 @@ class QuotesLoader:
             if not _active:
                 last, _active = cls._get_iss_data(currencies[isin][1])
         else:
-            last = cls._get_broker_data(isin)
+            last = cls._get_orderbook_data(isin)
         return last

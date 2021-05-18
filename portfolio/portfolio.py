@@ -131,8 +131,11 @@ class Portfolio:
                     if date in candles:
                         c1 = candles[date]
                         prev_price[isin] = c1
-                    else:
+                    elif isin in prev_price:
                         c1 = prev_price[isin]
+                    else:
+                        first_key = next(iter(candles))
+                        c1 = prev_price[isin] = candles[first_key]
 
                     security = SecuritiesManager.get_data(isin=isin)
                     cur = security['currency']
