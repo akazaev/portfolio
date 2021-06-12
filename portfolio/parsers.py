@@ -11,6 +11,7 @@ from portfolio.portfolio import Portfolio
 
 class Parser:
     BROKER = None
+    MARKETS = None
 
     def __init__(self, portfolio):
         self.portfolio = {'portfolio': portfolio, 'broker': self.BROKER}
@@ -309,9 +310,9 @@ class VtbParser(Parser):
 
             time, volume, cur_code = self.parse_record(record)
             if (oper_type == 'Зачисление денежных средств' or
-                    oper_type == 'Дивиденды'):
+                    oper_type == 'Дивиденды' or oper_type == 'Купонный доход'):
                 if any(word in comment for word in ('купон', 'dividend',
-                                                    'дивиденд')):
+                                                    'дивиденд', 'куп. дох.')):
                     manager = DividendManager
                     model = Dividend
                 elif not comment or 'перечисление денежных средств' in comment:
